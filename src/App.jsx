@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Layout, Menu, Tabs } from 'antd';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Layout, Menu, Result } from 'antd';
 import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import IntervieweeView from './features/interview/IntervieweeView.jsx';
-import InterviewerDashboard from './features/interview/InterviewerDashboard.jsx';
+const IntervieweeView = lazy(() => import('./features/interview/IntervieweeView.jsx'));
+const InterviewerDashboard = lazy(() => import('./features/interview/InterviewerDashboard.jsx'));
 import WelcomeBackModal from './components/WelcomeBackModal.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { useSelector } from 'react-redux';
 
 const { Header, Content } = Layout;
@@ -31,10 +32,15 @@ function AppShell() {
         <Menu theme="dark" mode="horizontal" selectedKeys={[tabKey]} items={items} onClick={(e) => navigate(e.key)} />
       </Header>
       <Content style={{ padding: 24 }}>
-        <Routes>
-          <Route path="/" element={<IntervieweeView />} />
-          <Route path="/dashboard" element={<InterviewerDashboard />} />
-        </Routes>
+        <ErrorBoundary>
+          <Suspense fallback={<div />}> 
+            <Routes>
+              <Route path="/" element={<IntervieweeView />} />
+              <Route path="/dashboard" element={<InterviewerDashboard />} />
+              <Route path="*" element={<Result status="404" title="Not Found" />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
         <WelcomeBackModal />
       </Content>
     </Layout>
