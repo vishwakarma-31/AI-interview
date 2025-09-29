@@ -237,7 +237,7 @@ const interviewSlice = createSlice({
   }
 });
 
-export const { startNewCandidate, recordAnswerAndNext, saveDraft, pauseInterview, resumeInterview, skipWithPenalty, setActiveCandidate, abandonActiveInterview, resumeTimerIfNeeded, updateNotes, updateTags } = interviewSlice.actions;
+export const { startNewCandidate, recordAnswerAndNext, saveDraft, pauseInterview, resumeInterview, skipWithPenalty, setActiveCandidate, abandonActiveInterview, resumeTimerIfNeeded, clearResumedAt, updateNotes, updateTags } = interviewSlice.actions;
 
 export default interviewSlice.reducer;
 
