@@ -1,244 +1,211 @@
-import { createSlice, nanoid } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { api } from '../../services/api';
 
-// Question bank with role presets
-const QUESTION_BANK = {
-  Frontend: {
-    Easy: [
-      { text: 'What is JSX?', difficulty: 'Easy', time: 20 },
-      { text: 'What are React hooks?', difficulty: 'Easy', time: 20 },
-      { text: 'What does useState do?', difficulty: 'Easy', time: 20 },
-    ],
-    Medium: [
-      { text: 'Explain the virtual DOM.', difficulty: 'Medium', time: 60 },
-      { text: 'Describe the difference between state and props.', difficulty: 'Medium', time: 60 },
-      { text: 'How does context help avoid prop drilling?', difficulty: 'Medium', time: 60 },
-    ],
-    Hard: [
-      { text: 'How would you optimize performance of a large React app?', difficulty: 'Hard', time: 120 },
-      { text: "Explain React's reconciliation process.", difficulty: 'Hard', time: 120 },
-      { text: 'How would you architect SSR/SSG with hydration?', difficulty: 'Hard', time: 120 },
-    ]
-  },
-  Backend: {
-    Easy: [
-      { text: 'What is REST?', difficulty: 'Easy', time: 20 },
-      { text: 'What is an HTTP status code?', difficulty: 'Easy', time: 20 },
-    ],
-    Medium: [
-      { text: 'Explain statelessness in REST APIs.', difficulty: 'Medium', time: 60 },
-      { text: 'What is database indexing and why?', difficulty: 'Medium', time: 60 },
-    ],
-    Hard: [
-      { text: 'Design a rate limiter for an API.', difficulty: 'Hard', time: 120 },
-      { text: 'How would you shard a database?', difficulty: 'Hard', time: 120 },
-    ]
+// Async thunks for API calls
+export const startInterview = createAsyncThunk(
+  'interview/startInterview',
+  async ({ name, email, phone, role, resume }, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('role', role);
+      if (resume) {
+        formData.append('resume', resume);
+      }
+      const response = await api.startInterview(formData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
   }
-};
+);
 
-function pickRandom(arr, n) {
-  const copy = [...arr];
-  const result = [];
-  while (copy.length && result.length < n) {
-    const i = Math.floor(Math.random() * copy.length);
-    result.push(copy.splice(i, 1)[0]);
+export const submitAnswer = createAsyncThunk(
+  'interview/submitAnswer',
+  async ({ sessionId, answerText }, { rejectWithValue }) => {
+    try {
+      const response = await api.submitAnswer(sessionId, answerText);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
   }
-  return result;
-}
+);
 
-function generateQuestions(role = 'Frontend') {
-  const bank = QUESTION_BANK[role] || QUESTION_BANK.Frontend;
-  const withDefaults = (q) => ({ ...q, answer: '', draft: '', score: 0 });
-  return [
-    ...pickRandom(bank.Easy, 2).map(withDefaults),
-    ...pickRandom(bank.Medium, 2).map(withDefaults),
-    ...pickRandom(bank.Hard, 2).map(withDefaults),
-  ];
-}
+export const finalizeInterview = createAsyncThunk(
+  'interview/finalizeInterview',
+  async (sessionId, { rejectWithValue }) => {
+    try {
+      const response = await api.finalizeInterview(sessionId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchCandidates = createAsyncThunk(
+  'interview/fetchCandidates',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.getCandidates();
+      return response.candidates;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
 
 const initialState = {
   candidates: [],
-  activeCandidateId: null,
-  // tracking per-candidate timers using absolute deadlines for persistence
-  timers: {}, // { [candidateId]: { questionIndex: number, deadlineMs: number, paused: boolean, remainingMs?: number } }
+  activeCandidate: null,
+  activeSession: null,
+  timers: {},
+  loading: false,
+  error: null
 };
 
 const interviewSlice = createSlice({
   name: 'interview',
   initialState,
   reducers: {
-    startNewCandidate: {
-      reducer(state, action) {
-        const candidate = action.payload;
-        state.candidates.push(candidate);
-        state.activeCandidateId = candidate.id;
-        // initialize timer for first question
-        const first = candidate.questions[0];
-        state.timers[candidate.id] = {
-          questionIndex: 0,
-          deadlineMs: Date.now() + (first?.time ?? 20) * 1000,
-          paused: false,
-        };
-      },
-      prepare({ name, email, phone, role = 'Frontend' }) {
-        const id = nanoid();
-        return {
-          payload: {
-            id,
-            status: 'in-progress',
-            name,
-            email,
-            phone,
-            role,
-            currentQuestionIndex: 0,
-            score: 0,
-            summary: '',
-            questions: generateQuestions(role),
-            notes: '',
-            tags: [],
-            pauseHistory: [{ type: 'start', ts: Date.now() }],
-            resumedAt: null,
-          }
-        };
+    clearError: (state) => {
+      state.error = null;
+    },
+    setActiveCandidate: (state, action) => {
+      state.activeCandidate = action.payload.candidate;
+      state.activeSession = action.payload.session;
+    },
+    saveDraft: (state, action) => {
+      const { questionIndex, draft } = action.payload;
+      if (state.activeSession && state.activeSession.questions[questionIndex]) {
+        state.activeSession.questions[questionIndex].draft = draft;
       }
     },
-    recordAnswerAndNext(state, action) {
-      const { candidateId, answerText, timeUp = false } = action.payload;
-      const candidate = state.candidates.find(c => c.id === candidateId);
-      if (!candidate) return;
-      const idx = candidate.currentQuestionIndex;
-      if (candidate.questions[idx]) {
-        candidate.questions[idx].answer = answerText || (timeUp ? '[No answer - time expired]' : '');
-        // Assign a mock per-question score (0-10)
-        candidate.questions[idx].score = Math.floor(Math.random() * 6) + 5; // 5..10
-        // Clear draft after submission
-        candidate.questions[idx].draft = '';
-      }
-      if (idx < candidate.questions.length - 1) {
-        candidate.currentQuestionIndex += 1;
-        const next = candidate.questions[candidate.currentQuestionIndex];
-        state.timers[candidate.id] = {
-          questionIndex: candidate.currentQuestionIndex,
-          deadlineMs: Date.now() + (next?.time ?? 20) * 1000,
-          paused: false,
-        };
-      } else {
-        candidate.status = 'completed';
-        // finalize score and summary
-        candidate.score = Math.floor(Math.random() * 41) + 60; // 60..100
-        candidate.summary = 'The candidate showed strong fundamentals in React.';
-        candidate.pauseHistory.push({ type: 'complete', ts: Date.now() });
-        delete state.timers[candidate.id];
+    updateTimer: (state, action) => {
+      const { sessionId, questionIndex, deadlineMs } = action.payload;
+      state.timers[sessionId] = {
+        questionIndex,
+        deadlineMs,
+        paused: false
+      };
+    },
+    pauseTimer: (state, action) => {
+      const { sessionId } = action.payload;
+      if (state.timers[sessionId]) {
+        state.timers[sessionId].paused = true;
+        state.timers[sessionId].remainingMs = 
+          Math.max(0, state.timers[sessionId].deadlineMs - Date.now());
       }
     },
-    saveDraft(state, action) {
-      const { candidateId, questionIndex, draft } = action.payload;
-      const candidate = state.candidates.find(c => c.id === candidateId);
-      if (!candidate) return;
-      if (candidate.questions[questionIndex]) {
-        candidate.questions[questionIndex].draft = draft;
+    resumeTimer: (state, action) => {
+      const { sessionId } = action.payload;
+      if (state.timers[sessionId] && state.timers[sessionId].paused) {
+        const remainingMs = state.timers[sessionId].remainingMs || 
+          Math.max(0, state.timers[sessionId].deadlineMs - Date.now());
+        state.timers[sessionId].paused = false;
+        state.timers[sessionId].deadlineMs = Date.now() + remainingMs;
+        delete state.timers[sessionId].remainingMs;
       }
     },
-    pauseInterview(state, action) {
-      const { candidateId } = action.payload;
-      const t = state.timers[candidateId];
-      if (!t || t.paused) return;
-      const remainingMs = Math.max(0, t.deadlineMs - Date.now());
-      t.paused = true;
-      t.remainingMs = remainingMs;
-      const cand = state.candidates.find(c => c.id === candidateId);
-      if (cand) cand.pauseHistory.push({ type: 'pause', ts: Date.now(), remainingMs });
+    // Add back the missing reducers
+    abandonActiveInterview: (state) => {
+      state.activeCandidate = null;
+      state.activeSession = null;
     },
-    resumeInterview(state, action) {
-      const { candidateId } = action.payload;
-      const t = state.timers[candidateId];
-      if (!t || !t.paused) return;
-      const ms = typeof t.remainingMs === 'number' ? t.remainingMs : Math.max(0, t.deadlineMs - Date.now());
-      t.paused = false;
-      t.deadlineMs = Date.now() + ms;
-      delete t.remainingMs;
-      const cand = state.candidates.find(c => c.id === candidateId);
-      if (cand) {
-        cand.pauseHistory.push({ type: 'resume', ts: Date.now(), remainingMs: ms });
-        cand.resumedAt = Date.now();
-      }
+    resumeTimerIfNeeded: (state, action) => {
+      // This is now handled by the timer logic above
     },
-    skipWithPenalty(state, action) {
-      const { candidateId } = action.payload;
-      const candidate = state.candidates.find(c => c.id === candidateId);
-      if (!candidate) return;
-      const idx = candidate.currentQuestionIndex;
-      if (candidate.questions[idx]) {
-        candidate.questions[idx].answer = '[Skipped]';
-        candidate.questions[idx].score = 0;
-      }
-      if (idx < candidate.questions.length - 1) {
-        candidate.currentQuestionIndex += 1;
-        const next = candidate.questions[candidate.currentQuestionIndex];
-        state.timers[candidate.id] = {
-          questionIndex: candidate.currentQuestionIndex,
-          deadlineMs: Date.now() + (next?.time ?? 20) * 1000,
-          paused: false,
-        };
-      } else {
-        candidate.status = 'completed';
-        candidate.score = Math.floor(Math.random() * 41) + 60;
-        candidate.summary = 'The candidate showed strong fundamentals in React.';
-        delete state.timers[candidate.id];
-      }
+    updateNotes: (state, action) => {
+      // This would update notes in the backend in a real implementation
     },
-    setActiveCandidate(state, action) {
-      state.activeCandidateId = action.payload;
-    },
-    abandonActiveInterview(state) {
-      const id = state.activeCandidateId;
-      if (!id) return;
-      const candidate = state.candidates.find(c => c.id === id);
-      if (candidate && candidate.status === 'in-progress') {
-        candidate.status = 'abandoned';
-      }
-      state.activeCandidateId = null;
-      delete state.timers[id];
-    },
-    resumeTimerIfNeeded(state, action) {
-      const { candidateId } = action.payload;
-      const candidate = state.candidates.find(c => c.id === candidateId);
-      if (!candidate) return;
-      const timer = state.timers[candidateId];
-      const current = candidate.questions[candidate.currentQuestionIndex];
-      if (!timer) {
-        state.timers[candidateId] = {
-          questionIndex: candidate.currentQuestionIndex,
-          deadlineMs: Date.now() + (current?.time ?? 20) * 1000,
-          paused: false,
-        };
-      } else if (timer.questionIndex !== candidate.currentQuestionIndex) {
-        state.timers[candidateId] = {
-          questionIndex: candidate.currentQuestionIndex,
-          deadlineMs: Date.now() + (current?.time ?? 20) * 1000,
-          paused: false,
-        };
-      }
-    },
-    clearResumedAt(state, action) {
-      const { candidateId } = action.payload;
-      const cand = state.candidates.find(c => c.id === candidateId);
-      if (cand) cand.resumedAt = null;
-    },
-    updateNotes(state, action) {
-      const { candidateId, notes } = action.payload;
-      const candidate = state.candidates.find(c => c.id === candidateId);
-      if (candidate) candidate.notes = notes;
-    },
-    updateTags(state, action) {
-      const { candidateId, tags } = action.payload;
-      const candidate = state.candidates.find(c => c.id === candidateId);
-      if (candidate) candidate.tags = tags;
+    updateTags: (state, action) => {
+      // This would update tags in the backend in a real implementation
     }
+  },
+  extraReducers: (builder) => {
+    builder
+      // Start interview
+      .addCase(startInterview.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(startInterview.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activeCandidate = action.payload.candidate;
+        state.activeSession = action.payload.session;
+        // Initialize timer for first question
+        const firstQuestion = action.payload.session.questions[0];
+        if (firstQuestion) {
+          state.timers[action.payload.session.id] = {
+            questionIndex: 0,
+            deadlineMs: Date.now() + (firstQuestion.time * 1000),
+            paused: false
+          };
+        }
+      })
+      .addCase(startInterview.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Submit answer
+      .addCase(submitAnswer.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(submitAnswer.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload.nextQuestion) {
+          // Move to next question
+          state.activeSession.currentQuestionIndex = action.payload.nextQuestion.index;
+          // Update timer for next question
+          const nextQuestion = action.payload.nextQuestion.question;
+          state.timers[state.activeSession.id] = {
+            questionIndex: action.payload.nextQuestion.index,
+            deadlineMs: Date.now() + (nextQuestion.time * 1000),
+            paused: false
+          };
+        } else if (action.payload.finalScore !== undefined) {
+          // Interview completed
+          state.activeSession.score = action.payload.finalScore;
+          state.activeSession.summary = action.payload.summary;
+          state.activeSession.questions = action.payload.questions;
+          delete state.timers[state.activeSession.id];
+        }
+      })
+      .addCase(submitAnswer.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Fetch candidates
+      .addCase(fetchCandidates.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchCandidates.fulfilled, (state, action) => {
+        state.loading = false;
+        state.candidates = action.payload;
+      })
+      .addCase(fetchCandidates.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   }
 });
 
-export const { startNewCandidate, recordAnswerAndNext, saveDraft, pauseInterview, resumeInterview, skipWithPenalty, setActiveCandidate, abandonActiveInterview, resumeTimerIfNeeded, clearResumedAt, updateNotes, updateTags } = interviewSlice.actions;
+export const { 
+  clearError, 
+  setActiveCandidate, 
+  saveDraft, 
+  updateTimer, 
+  pauseTimer, 
+  resumeTimer,
+  abandonActiveInterview,
+  resumeTimerIfNeeded,
+  updateNotes,
+  updateTags
+} = interviewSlice.actions;
 
 export default interviewSlice.reducer;
-
-
