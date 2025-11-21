@@ -3,6 +3,7 @@ const InterviewSession = require('../models/InterviewSession');
 const { parsePDF, parseDOCX, generateQuestions, gradeAnswer, generateSummary } = require('../services/aiService');
 const path = require('path');
 const { setInMemoryStorage } = require('./candidateController');
+const mongoose = require('mongoose');
 
 // In-memory storage for demonstration purposes when MongoDB is not available
 let inMemoryCandidates = [];
@@ -49,10 +50,12 @@ async function startInterview(req, res) {
       }
     }
     
-    // Check if we're using MongoDB or in-memory storage
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
     let candidate, interviewSession;
     
-    if (Candidate && InterviewSession) {
+    if (isDatabaseConnected) {
       // Use MongoDB
       candidate = new Candidate({
         name,
@@ -183,10 +186,12 @@ async function submitAnswer(req, res) {
       });
     }
     
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
     let interviewSession;
     
-    // Check if we're using MongoDB or in-memory storage
-    if (InterviewSession) {
+    if (isDatabaseConnected) {
       // Use MongoDB
       interviewSession = await InterviewSession.findById(sessionId);
       if (!interviewSession) {
@@ -238,7 +243,7 @@ async function submitAnswer(req, res) {
       interviewSession.currentQuestionIndex += 1;
       
       // Save session (if using MongoDB)
-      if (InterviewSession) {
+      if (isDatabaseConnected) {
         await interviewSession.save();
       }
       
@@ -254,7 +259,7 @@ async function submitAnswer(req, res) {
       });
     } else {
       // Complete interview
-      if (InterviewSession) {
+      if (isDatabaseConnected) {
         // Using MongoDB
         const candidate = await Candidate.findById(interviewSession.candidateId);
         if (candidate) {
@@ -330,10 +335,12 @@ async function finalizeInterview(req, res) {
       return res.status(400).json({ error: 'Missing required field: sessionId' });
     }
     
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
     let interviewSession;
     
-    // Check if we're using MongoDB or in-memory storage
-    if (InterviewSession) {
+    if (isDatabaseConnected) {
       // Use MongoDB
       interviewSession = await InterviewSession.findById(sessionId);
       if (!interviewSession) {

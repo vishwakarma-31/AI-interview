@@ -1,5 +1,6 @@
 const Candidate = require('../models/Candidate');
 const InterviewSession = require('../models/InterviewSession');
+const mongoose = require('mongoose');
 
 // Reference to in-memory storage from interviewController
 let inMemoryCandidates = [];
@@ -19,8 +20,10 @@ function setInMemoryStorage(candidates, sessions) {
  */
 async function getAllCandidates(req, res) {
   try {
-    // Check if we're using MongoDB or in-memory storage
-    if (Candidate && InterviewSession) {
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
+    if (isDatabaseConnected) {
       // Use MongoDB
       const candidates = await Candidate.find({}).sort({ createdAt: -1 });
       

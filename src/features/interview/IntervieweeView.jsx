@@ -71,6 +71,7 @@ export default function IntervieweeView() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(true);
+  const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(true);
   
   const answerRef = useRef();
   const webcamRef = useRef(null);
@@ -78,6 +79,12 @@ export default function IntervieweeView() {
   const synthRef = useRef(window.speechSynthesis);
   const timerRef = useRef(null);
   const silenceTimerRef = useRef(null);
+
+  // Check for Speech Recognition support
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setIsSpeechRecognitionSupported(!!SpeechRecognition);
+  }, []);
 
   // Handle API errors
   useEffect(() => {
@@ -131,6 +138,10 @@ export default function IntervieweeView() {
 
   // Initialize speech recognition
   useEffect(() => {
+    if (!isSpeechRecognitionSupported) {
+      return;
+    }
+    
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognitionRef.current = new SpeechRecognition();
@@ -186,7 +197,7 @@ export default function IntervieweeView() {
         clearTimeout(silenceTimerRef.current);
       }
     };
-  }, []);
+  }, [isSpeechRecognitionSupported]);
 
   const speakText = (text) => {
     if (synthRef.current.speaking) {
@@ -213,6 +224,11 @@ export default function IntervieweeView() {
   };
 
   const toggleRecording = () => {
+    if (!isSpeechRecognitionSupported) {
+      message.error('Speech recognition is not supported in your browser. Please use Google Chrome or Microsoft Edge.');
+      return;
+    }
+    
     if (!recognitionRef.current) {
       message.error('Speech recognition is not supported in your browser');
       return;
@@ -342,6 +358,15 @@ export default function IntervieweeView() {
     return (
       <div className="interview-setup-container">
         <div className="setup-card">
+          {!isSpeechRecognitionSupported && (
+            <Alert 
+              message="Speech Recognition Not Supported" 
+              description="Speech Recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge for the full AI experience." 
+              type="warning" 
+              showIcon 
+              style={{ marginBottom: 20 }}
+            />
+          )}
           <h2>Start a New Interview</h2>
           <Upload.Dragger 
             multiple={false} 
@@ -441,6 +466,18 @@ export default function IntervieweeView() {
 
   return (
     <div className="video-interview-container">
+      {!isSpeechRecognitionSupported && (
+        <div style={{ position: 'absolute', top: 20, left: 20, right: 20, zIndex: 1000 }}>
+          <Alert 
+            message="Speech Recognition Not Supported" 
+            description="Speech Recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge for the full AI experience." 
+            type="warning" 
+            showIcon 
+            closable
+          />
+        </div>
+      )}
+      
       {/* AI Interviewer Avatar */}
       <div className="ai-interviewer">
         <AIAvatar isSpeaking={isSpeaking} />
