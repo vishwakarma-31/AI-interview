@@ -1,30 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-
-// Import controllers
-const interviewController = require('../controllers/interviewController');
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    const filetypes = /pdf|docx/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    
-    if (mimetype || extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only PDF and DOCX files are allowed'));
-    }
-  }
-});
+const upload = multer({ storage: storage });
+
+// Import controllers
+const interviewController = require('../controllers/interviewController');
 
 // Route to start a new interview session
 router.post('/start', upload.single('resume'), interviewController.startInterview);
