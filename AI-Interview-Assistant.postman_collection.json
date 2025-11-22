@@ -1,0 +1,252 @@
+{
+  "info": {
+    "name": "AI Interview Assistant API",
+    "description": "Postman collection for the AI Interview Assistant API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"securePassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticate a user and return JWT tokens"
+          },
+          "response": []
+        },
+        {
+          "name": "User Registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"user@example.com\",\n  \"password\": \"securePassword123\",\n  \"role\": \"interviewer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Register a new user account"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Interview",
+      "item": [
+        {
+          "name": "Start Interview",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Jane Smith",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "jane@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "+1 (555) 123-4567",
+                  "type": "text"
+                },
+                {
+                  "key": "role",
+                  "value": "Frontend Developer",
+                  "type": "text"
+                },
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/interview/start",
+              "host": ["{{base_url}}"],
+              "path": ["interview", "start"]
+            },
+            "description": "Initialize a new interview session for a candidate"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"507f1f77bcf86cd799439011\",\n  \"answerText\": \"This is my answer to the technical question.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/interview/answer",
+              "host": ["{{base_url}}"],
+              "path": ["interview", "answer"]
+            },
+            "description": "Submit a candidate's answer and get the next question or final results"
+          },
+          "response": []
+        },
+        {
+          "name": "Finalize Interview",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interview/:id",
+              "host": ["{{base_url}}"],
+              "path": ["interview", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "507f1f77bcf86cd799439011",
+                  "description": "Interview session ID"
+                }
+              ]
+            },
+            "description": "Finalize and complete an interview session"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Interview Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/interview/:id",
+              "host": ["{{base_url}}"],
+              "path": ["interview", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "507f1f77bcf86cd799439011",
+                  "description": "Interview session ID"
+                }
+              ]
+            },
+            "description": "Retrieve details of a specific interview session"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Interview",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/interview/:id",
+              "host": ["{{base_url}}"],
+              "path": ["interview", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "507f1f77bcf86cd799439011",
+                  "description": "Interview session ID"
+                }
+              ]
+            },
+            "description": "Delete an interview session"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Candidates",
+      "item": [
+        {
+          "name": "Get All Candidates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/candidates?limit=10&offset=0&status=in-progress&role=Frontend%20Developer&sortBy=score&order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["candidates"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "status",
+                  "value": "in-progress"
+                },
+                {
+                  "key": "role",
+                  "value": "Frontend Developer"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "score"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            },
+            "description": "Retrieve a list of all candidates with their interview sessions"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    }
+  ]
+}

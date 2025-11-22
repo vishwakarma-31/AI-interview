@@ -27,9 +27,19 @@ AI Interview Assistant is a full-stack web application that streamlines the tech
 
 ## Prerequisites
 
-- Node.js (v16 or higher)
-- MongoDB (local or cloud instance)
-- OpenAI API key
+Before you begin, ensure you have the following installed:
+
+- **Node.js**: v18.18.2 (use `.nvmrc` file to set the correct version)
+- **npm**: v9.x or higher
+- **MongoDB**: v5.0 or higher (local instance or MongoDB Atlas)
+- **Redis**: v6.x or higher
+- **OpenAI API key**: Required for AI features
+
+### System Requirements
+
+- **RAM**: Minimum 4GB, Recommended 8GB
+- **Disk Space**: Minimum 2GB free space
+- **Operating System**: Windows 10+, macOS 10.15+, or Linux (Ubuntu 20.04+, CentOS 8+)
 
 ## Installation
 
@@ -39,43 +49,80 @@ AI Interview Assistant is a full-stack web application that streamlines the tech
    cd ai-interview
    ```
 
-2. Install frontend dependencies:
+2. Set Node.js version using nvm (recommended):
+   ```bash
+   nvm use
+   ```
+
+3. Install frontend dependencies:
    ```bash
    npm install
    ```
 
-3. Install backend dependencies:
+4. Install backend dependencies:
    ```bash
    cd backend
    npm install
    cd ..
    ```
 
-4. Create environment files:
+5. Create environment files:
    
    Create a `.env` file in the `backend` directory with the following content:
    ```env
+   # Server Configuration
    PORT=5000
+   SSL_PORT=5443
+   
+   # Database Configuration
    MONGO_URI=mongodb://localhost:27017/ai-interview
+   
+   # Redis Configuration
+   REDIS_HOST=localhost
+   REDIS_PORT=6379
+   
+   # Session Configuration
+   SESSION_SECRET=your-session-secret-here
+   
+   # OpenAI Configuration
    OPENAI_API_KEY=your_openai_api_key_here
+   
+   # JWT Configuration
+   JWT_SECRET=your-jwt-secret-here
+   JWT_REFRESH_SECRET=your-jwt-refresh-secret-here
+   
+   # Encryption Configuration
+   ENCRYPTION_KEY=your-encryption-key-here
+   
+   # Frontend URL (for CORS)
+   FRONTEND_URL=http://localhost:5173
    ```
 
    Create a `.env` file in the root directory with the following content:
    ```env
-   REACT_APP_API_BASE_URL=http://localhost:5000/api
+   VITE_API_BASE_URL=http://localhost:5000/api
    ```
 
 ## Running the Application
 
 ### Development Mode
 
-1. Start the backend server:
+1. Start MongoDB and Redis services:
+   ```bash
+   # For MongoDB (if running locally)
+   mongod
+   
+   # For Redis (if running locally)
+   redis-server
+   ```
+
+2. Start the backend server:
    ```bash
    cd backend
    npm run dev
    ```
 
-2. In a separate terminal, start the frontend development server:
+3. In a separate terminal, start the frontend development server:
    ```bash
    npm run dev
    ```
@@ -102,6 +149,8 @@ The application will be available at:
 ```bash
 docker-compose up
 ```
+
+This will start all required services (backend, MongoDB, Redis) in separate containers.
 
 ## API Endpoints
 
@@ -157,12 +206,12 @@ OR (when interview is completed):
 }
 ```
 
-#### POST `/api/interview/submit`
+#### PATCH `/api/interview/:id`
 Finalize the interview
 
 **Request:**
-- Body (JSON):
-  - `sessionId` (string, required): Interview session ID
+- URL Parameter:
+  - `id` (string, required): Interview session ID
 
 **Response:**
 ```json
@@ -218,6 +267,39 @@ ai-interview/
 ├── docker-compose.yml # Multi-container Docker setup
 └── vercel.json        # Vercel deployment configuration
 ```
+
+## Common Setup Errors & Troubleshooting
+
+### 1. MongoDB Connection Error
+**Error**: `MongoNetworkError: failed to connect to server`
+**Solution**: 
+- Ensure MongoDB is running: `mongod`
+- Check MONGO_URI in .env file
+- Verify MongoDB version compatibility
+
+### 2. Redis Connection Error
+**Error**: `Error: connect ECONNREFUSED 127.0.0.1:6379`
+**Solution**:
+- Ensure Redis is running: `redis-server`
+- Check Redis configuration in .env file
+
+### 3. OpenAI API Key Error
+**Error**: `401 Unauthorized: Invalid API key`
+**Solution**:
+- Verify OPENAI_API_KEY in .env file
+- Ensure API key has proper permissions
+
+### 4. Port Already in Use
+**Error**: `Error: listen EADDRINUSE: address already in use`
+**Solution**:
+- Change PORT in .env file
+- Kill processes using the port: `lsof -i :5000` then `kill -9 <PID>`
+
+### 5. Node.js Version Mismatch
+**Error**: Various syntax or module errors
+**Solution**:
+- Use nvm to set correct Node.js version: `nvm use`
+- Check .nvmrc file for required version
 
 ## Contributing
 

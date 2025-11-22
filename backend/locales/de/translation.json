@@ -1,0 +1,29 @@
+{
+  "welcome": "Willkommen beim KI-Interview-Assistenten",
+  "interview": {
+    "title": "Interview",
+    "start": "Interview starten",
+    "complete": "Interview abschließen",
+    "questions": "Fragen",
+    "score": "Punktzahl"
+  },
+  "candidate": {
+    "name": "Kandidatenname",
+    "email": "E-Mail-Adresse",
+    "phone": "Telefonnummer",
+    "role": "Rolle",
+    "list_success": "Kandidaten erfolgreich abgerufen"
+  },
+  "errors": {
+    "invalid_email": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+    "required_field": "Dieses Feld ist erforderlich",
+    "min_length": "Dieses Feld muss mindestens {{count}} Zeichen lang sein"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "submit": "Einreichen"
+  }
+}

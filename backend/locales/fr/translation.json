@@ -1,0 +1,29 @@
+{
+  "welcome": "Bienvenue dans l'Assistant d'Entretien IA",
+  "interview": {
+    "title": "Entretien",
+    "start": "Commencer l'Entretien",
+    "complete": "Terminer l'Entretien",
+    "questions": "Questions",
+    "score": "Score"
+  },
+  "candidate": {
+    "name": "Nom du Candidat",
+    "email": "Adresse Email",
+    "phone": "Numéro de Téléphone",
+    "role": "Rôle",
+    "list_success": "Candidats récupérés avec succès"
+  },
+  "errors": {
+    "invalid_email": "Veuillez entrer une adresse email valide",
+    "required_field": "Ce champ est requis",
+    "min_length": "Ce champ doit contenir au moins {{count}} caractères"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "submit": "Soumettre"
+  }
+}

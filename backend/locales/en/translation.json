@@ -1,0 +1,29 @@
+{
+  "welcome": "Welcome to AI Interview Assistant",
+  "interview": {
+    "title": "Interview",
+    "start": "Start Interview",
+    "complete": "Complete Interview",
+    "questions": "Questions",
+    "score": "Score"
+  },
+  "candidate": {
+    "name": "Candidate Name",
+    "email": "Email Address",
+    "phone": "Phone Number",
+    "role": "Role",
+    "list_success": "Candidates retrieved successfully"
+  },
+  "errors": {
+    "invalid_email": "Please enter a valid email address",
+    "required_field": "This field is required",
+    "min_length": "This field must be at least {{count}} characters long"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "submit": "Submit"
+  }
+}

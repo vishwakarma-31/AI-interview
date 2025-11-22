@@ -1,580 +1,400 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, Button, Input, Form, Card, Space, message, Select, Alert, Spin, Modal } from 'antd';
-import InputMask from 'react-input-mask';
-import { InboxOutlined, PhoneFilled, PauseOutlined, PlayCircleOutlined, AudioMutedOutlined, AudioOutlined, VideoCameraOutlined, StopOutlined } from '@ant-design/icons';
-import { useDispatch, useSelector } from 'react-redux';
-import { clearError, pauseTimer, resumeTimer, saveDraft, startInterview, submitAnswer } from './interviewSlice.js';
-import Webcam from 'react-webcam';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// Mock AI avatar component
-const AIAvatar = ({ isSpeaking }) => (
-  <div className="ai-avatar-container">
-    <motion.div 
-      className="ai-avatar"
-      animate={isSpeaking ? { scale: [1, 1.05, 1] } : { scale: 1 }}
-      transition={{ duration: 1.5, repeat: isSpeaking ? Infinity : 0 }}
-    >
-      <div className="avatar-placeholder">
-        <VideoCameraOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
-        <div className="avatar-label">AI Interviewer</div>
-      </div>
-    </motion.div>
-  </div>
-);
-
-// Waveform animation for speaking
-const Waveform = () => (
-  <div className="waveform">
-    {[...Array(15)].map((_, i) => (
-      <motion.div
-        key={i}
-        className="bar"
-        animate={{
-          height: [10, 25, 10],
-        }}
-        transition={{
-          duration: 0.8,
-          repeat: Infinity,
-          delay: i * 0.05,
-        }}
-      />
-    ))}
-  </div>
-);
-
-// Timer component with pulse effect
-const InterviewTimer = ({ timeLeft, totalTime, isRunning }) => {
-  const isCritical = timeLeft <= 10 && timeLeft > 0;
-  
-  return (
-    <div className={`interview-timer ${isCritical ? 'critical' : ''}`}>
-      <motion.div
-        animate={isCritical ? { scale: [1, 1.1, 1] } : {}}
-        transition={isCritical ? { duration: 1, repeat: Infinity } : {}}
-      >
-        {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-      </motion.div>
-    </div>
-  );
-};
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Form, Button, Spin, Modal, message, Steps, Result, Card } from 'antd';
+import { RedoOutlined, VideoCameraOutlined, FileOutlined } from '@ant-design/icons';
+import { useInterview } from '../../contexts/InterviewContext';
+import IntervieweeErrorBoundary from '../../components/IntervieweeErrorBoundary';
+import InterviewSetupForm from './components/InterviewSetupForm';
+import InterviewQuestionView from './components/InterviewQuestionView';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+import { useInterviewTimer } from '../../hooks/useInterviewTimer';
+import { useDraftSaving } from '../../hooks/useDraftSaving';
+import { useToast } from '../../components/ToastContainer.jsx';
+import SkeletonLoader from '../../components/SkeletonLoader.jsx';
 
 export default function IntervieweeView() {
-  const dispatch = useDispatch();
-  const { activeCandidate, activeSession, timers, loading, error } = useSelector(s => s.interview);
+  return (
+    <IntervieweeErrorBoundary>
+      <IntervieweeViewContent />
+    </IntervieweeErrorBoundary>
+  );
+}
+
+function IntervieweeViewContent() {
+  const {
+    activeCandidate,
+    activeSession,
+    loadingStates,
+    error,
+    errors,
+    clearError,
+    saveDraft,
+    startInterview,
+    submitAnswer,
+  } = useInterview();
+
+  const { addToast } = useToast();
+
   const [prefill, setPrefill] = useState({ name: '', email: '' });
   const [form] = Form.useForm();
-  const [resumeFile, setResumeFile] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [resumeFile] = useState(null);
   const [transcript, setTranscript] = useState('');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(true);
-  const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(true);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [extendedTime, setExtendedTime] = useState(0);
+  const [showReview, setShowReview] = useState(false); // New state for review step
+  const [reviewAnswer, setReviewAnswer] = useState(''); // New state for review answer
+  const [showPreview, setShowPreview] = useState(false); // New state for preview mode
+  const [previewData, setPreviewData] = useState(null); // New state for preview data
   
-  const answerRef = useRef();
-  const webcamRef = useRef(null);
-  const recognitionRef = useRef(null);
-  const synthRef = useRef(window.speechSynthesis);
-  const timerRef = useRef(null);
-  const silenceTimerRef = useRef(null);
-
-  // Check for Speech Recognition support
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setIsSpeechRecognitionSupported(!!SpeechRecognition);
-  }, []);
+  // Refs for focus management
+  const mainContainerRef = useRef(null);
 
   // Handle API errors
   useEffect(() => {
     if (error) {
       message.error(error);
-      dispatch(clearError());
+      clearError();
+      addToast(error, 'error');
     }
-  }, [error, dispatch]);
+  }, [error, clearError, addToast]);
 
-  // Timer effect
+  // Handle specific API errors with retry option
   useEffect(() => {
-    if (activeSession && isTimerRunning) {
-      const timer = timers[activeSession.id];
-      if (timer && !timer.paused) {
-        const updateTimer = () => {
-          const now = Date.now();
-          const remaining = Math.max(0, Math.floor((timer.deadlineMs - now) / 1000));
-          setTimeLeft(remaining);
-          
-          if (remaining <= 0) {
-            // Time's up, submit empty answer
-            handleSubmitAnswer('');
-          }
-        };
-        
-        updateTimer();
-        timerRef.current = setInterval(updateTimer, 1000);
-        
-        return () => {
-          if (timerRef.current) clearInterval(timerRef.current);
-        };
-      }
+    if (errors.startInterview) {
+      const content = (
+        <div>
+          <div>Failed to start interview: {errors.startInterview}</div>
+          <Button
+            type="link"
+            icon={<RedoOutlined />}
+            onClick={() => form.submit()}
+            size="small"
+            style={{ padding: 0, marginTop: 4 }}
+          >
+            Retry
+          </Button>
+        </div>
+      );
+      message.error({
+        content,
+        duration: 0, // Keep the message until manually closed
+        key: 'startInterviewError',
+      });
+      addToast(`Failed to start interview: ${errors.startInterview}`, 'error');
     }
-  }, [activeSession, timers, isTimerRunning]);
 
-  // Text-to-Speech effect
-  useEffect(() => {
-    if (activeSession && !isMuted) {
-      const question = activeSession.questions[activeSession.currentQuestionIndex];
-      if (question && question.text) {
-        speakText(question.text);
-      }
+    if (errors.submitAnswer) {
+      const content = (
+        <div>
+          <div>Failed to submit answer: {errors.submitAnswer}</div>
+          <Button
+            type="link"
+            icon={<RedoOutlined />}
+            onClick={() => {
+              if (activeSession) {
+                submitAnswer({
+                  sessionId: activeSession.id,
+                  answerText: transcript,
+                });
+              }
+            }}
+            size="small"
+            style={{ padding: 0, marginTop: 4 }}
+          >
+            Retry
+          </Button>
+        </div>
+      );
+      message.error({
+        content,
+        duration: 0, // Keep the message until manually closed
+        key: 'submitAnswerError',
+      });
+      addToast(`Failed to submit answer: ${errors.submitAnswer}`, 'error');
     }
-    
-    return () => {
-      if (synthRef.current.speaking) {
-        synthRef.current.cancel();
-      }
-    };
-  }, [activeSession, activeSession?.currentQuestionIndex, isMuted]);
+  }, [errors, form, transcript, activeSession, submitAnswer, addToast]);
 
-  // Initialize speech recognition
-  useEffect(() => {
-    if (!isSpeechRecognitionSupported) {
-      return;
-    }
-    
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
-      
-      recognitionRef.current.onresult = (event) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-        
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' ';
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-        
-        setTranscript(prev => prev + finalTranscript);
-        
-        // Reset silence timer when speech is detected
-        if (finalTranscript || interimTranscript) {
-          if (silenceTimerRef.current) {
-            clearTimeout(silenceTimerRef.current);
-          }
-          
-          // Set timer to auto-submit after 3 seconds of silence
-          silenceTimerRef.current = setTimeout(() => {
-            if (transcript.trim()) {
-              handleSubmitAnswer(transcript);
-            }
-          }, 3000);
-        }
-      };
-      
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setIsRecording(false);
-      };
-      
-      recognitionRef.current.onend = () => {
-        setIsRecording(false);
-      };
-    }
-    
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-      }
-    };
-  }, [isSpeechRecognitionSupported]);
+  // Use custom hooks
+  const { debouncedSaveDraft, initializeTranscriptFromDraft } = useDraftSaving(
+    saveDraft,
+    activeSession
+  );
 
-  const speakText = (text) => {
-    if (synthRef.current.speaking) {
-      synthRef.current.cancel();
-    }
-    
-    if (text && !isMuted) {
-      setIsSpeaking(true);
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.onend = () => setIsSpeaking(false);
-      synthRef.current.speak(utterance);
-    }
-  };
+  const handleSubmitAnswer = useCallback(
+    text => {
+      if (!activeSession) return;
 
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    if (isMuted && activeSession) {
-      // If unmuting, speak the current question
-      const question = activeSession.questions[activeSession.currentQuestionIndex];
-      if (question && question.text) {
-        speakText(question.text);
-      }
-    }
-  };
+      // Call submit answer function directly
+      submitAnswer({
+        sessionId: activeSession.id,
+        answerText: text || transcript,
+      });
 
-  const toggleRecording = () => {
-    if (!isSpeechRecognitionSupported) {
-      message.error('Speech recognition is not supported in your browser. Please use Google Chrome or Microsoft Edge.');
-      return;
-    }
-    
-    if (!recognitionRef.current) {
-      message.error('Speech recognition is not supported in your browser');
-      return;
-    }
-    
-    if (isRecording) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-      }
-    } else {
       setTranscript('');
-      recognitionRef.current.start();
-      setIsRecording(true);
-      
-      // Set timer to auto-submit after 3 seconds of silence
-      silenceTimerRef.current = setTimeout(() => {
-        if (transcript.trim()) {
-          handleSubmitAnswer(transcript);
-        }
-      }, 3000);
-    }
-  };
+      setShowReview(false); // Hide review step after submission
+      setReviewAnswer(''); // Clear review answer
+      addToast('Answer submitted successfully', 'success');
+    },
+    [activeSession, submitAnswer, transcript, addToast]
+  );
 
-  const beforeUpload = (file) => {
-    const isValid = file.type === 'application/pdf' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx') || file.name.endsWith('.pdf');
-    if (!isValid) {
-      message.error('Only PDF or DOCX files are allowed');
-      return Upload.LIST_IGNORE;
-    }
-    
-    // Extract name and email from filename (simplified)
-    const base = file?.name || '';
-    const name = base.split('.')[0].replace(/[_-]/g, ' ').trim() || 'John Doe';
-    const email = name.toLowerCase().replace(/\s+/g, '.') + '@example.com';
-    
-    setPrefill({ name, email });
-    setResumeFile(file);
-    form.setFieldsValue({ name, email });
-    message.success('Resume selected. Details pre-filled.');
-    return false; // Prevent automatic upload
-  };
+  const { timeLeft, isTimerRunning, isTimerPaused, pauseTimer, resumeTimer } = useInterviewTimer(
+    activeSession,
+    handleSubmitAnswer,
+    transcript
+  );
 
-  const onStart = async () => {
+  const { isRecording, isSpeechRecognitionSupported, toggleRecording } = useSpeechRecognition(
+    newTranscript => setTranscript(newTranscript),
+    handleSubmitAnswer,
+    activeSession,
+    saveDraft
+  );
+
+  // Initialize transcript from draft when session or question changes
+  useEffect(() => {
+    if (activeSession && activeSession.questions && activeSession.questions.length > 0) {
+      const question = activeSession.questions[activeSession.currentQuestionIndex];
+      const initialTranscript = initializeTranscriptFromDraft(question);
+      setTranscript(initialTranscript);
+    }
+  }, [activeSession, initializeTranscriptFromDraft]);
+
+  const onStart = useCallback(async () => {
     const values = await form.validateFields().catch(() => null);
     if (!values) return;
-    
+
     const { name, email, phone, role } = values;
     if (!name || !email || !phone) {
       message.warning('Please provide Name, Email and Phone to start.');
+      addToast('Please provide Name, Email and Phone to start.', 'warning');
       return;
     }
-    
-    // Dispatch start interview action
-    dispatch(startInterview({ 
-      name, 
-      email, 
-      phone, 
-      role,
-      resume: resumeFile
-    }));
-  };
 
-  const handleSubmitAnswer = (text) => {
-    if (!activeSession) return;
-    
-    dispatch(submitAnswer({ 
-      sessionId: activeSession.id, 
-      answerText: text || transcript 
-    }));
-    
-    setTranscript('');
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
+    // For preview mode, just show the preview without starting the interview
+    if (showPreview) {
+      setPreviewData({
+        name,
+        email,
+        phone,
+        role,
+        questions: [
+          { text: "Explain the concept of React hooks and their advantages.", difficulty: "Medium", timeLimit: 120 },
+          { text: "How would you optimize the performance of a React application?", difficulty: "Hard", timeLimit: 180 },
+          { text: "Describe the difference between state and props in React.", difficulty: "Easy", timeLimit: 90 },
+          { text: "What is the purpose of Redux in a React application?", difficulty: "Medium", timeLimit: 150 },
+          { text: "How do you handle side effects in React components?", difficulty: "Medium", timeLimit: 120 }
+        ]
+      });
+      return;
     }
-  };
 
-  const handleSkip = () => {
-    if (!activeSession) return;
-    
-    dispatch(submitAnswer({ 
-      sessionId: activeSession.id, 
-      answerText: '[Skipped]' 
-    }));
-  };
+    // Call start interview function directly
+    try {
+      await startInterview({
+        name,
+        email,
+        phone,
+        role,
+        resume: resumeFile,
+      });
+      addToast('Interview started successfully', 'success');
+    } catch (err) {
+      console.error('Failed to start interview:', err);
+      addToast('Failed to start interview. Please try again.', 'error');
+    }
+  }, [form, showPreview, startInterview, resumeFile, addToast]);
 
-  const handlePause = () => {
-    if (!activeSession) return;
-    dispatch(pauseTimer({ sessionId: activeSession.id }));
-    setIsTimerRunning(false);
-    message.info('Interview paused');
-  };
+  // Reset form when candidate is abandoned
+  useEffect(() => {
+    if (!activeCandidate) {
+      form.resetFields();
+      setPrefill({ name: '', email: '' });
+    }
+  }, [activeCandidate, form]);
 
-  const handleResume = () => {
-    if (!activeSession) return;
-    dispatch(resumeTimer({ sessionId: activeSession.id }));
-    setIsTimerRunning(true);
-    message.success('Resumed');
-  };
-
-  const handleEndCall = () => {
-    if (!activeSession) return;
-    
-    Modal.confirm({
-      title: 'End Interview',
-      content: 'Are you sure you want to end this interview?',
-      onOk: () => {
-        handleSubmitAnswer(transcript || '[No answer provided]');
+  // Handle before unload to warn user about unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (activeSession && activeSession.status === 'in-progress') {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
       }
-    });
-  };
+    };
 
-  // Show loading spinner when starting interview
-  if (loading && !activeSession) {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [activeSession]);
+
+  // Render different views based on state
+  if (loadingStates.startInterview) {
     return (
-      <div className="video-interview-container">
-        <div className="loading-overlay">
-          <Spin size="large" tip="Starting interview..." />
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+        <Spin size="large" tip="Starting interview..." />
       </div>
     );
   }
 
-  // Show interview setup form if no active session or session not in progress
-  if (!activeSession || activeCandidate?.status !== 'in-progress') {
+  // Show preview if in preview mode
+  if (previewData) {
     return (
-      <div className="interview-setup-container">
-        <div className="setup-card">
-          {!isSpeechRecognitionSupported && (
-            <Alert 
-              message="Speech Recognition Not Supported" 
-              description="Speech Recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge for the full AI experience." 
-              type="warning" 
-              showIcon 
-              style={{ marginBottom: 20 }}
-            />
-          )}
-          <h2>Start a New Interview</h2>
-          <Upload.Dragger 
-            multiple={false} 
-            beforeUpload={beforeUpload} 
-            accept=".pdf,.docx"
-            maxCount={1}
-          >
-            <p className="ant-upload-drag-icon">
-              <InboxOutlined />
-            </p>
-            <p className="ant-upload-text">Click or drag a resume to upload (optional)</p>
-          </Upload.Dragger>
-          <Form 
-            form={form} 
-            layout="vertical" 
-            style={{ marginTop: 16 }} 
-            initialValues={{ name: prefill.name, email: prefill.email, phone: '', role: 'Frontend' }}
-          >
-            <Form.Item 
-              label="Name" 
-              name="name" 
-              rules={[{ required: true, message: 'Please enter your name' }]}
-            >
-              <Input placeholder="Your full name" />
-            </Form.Item>
-            <Form.Item 
-              label="Email" 
-              name="email" 
-              rules={[{ required: true, type: 'email', message: 'Enter a valid email' }]}
-            >
-              <Input placeholder="you@example.com" />
-            </Form.Item>
-            <Form.Item 
-              label="Phone" 
-              name="phone" 
-              rules={[
-                { required: true, message: 'Please enter your phone number' },
-                { validator: (_, v) => {
-                  const digits = (v || '').replace(/\D/g, '');
-                  return digits.length >= 10 ? Promise.resolve() : Promise.reject(new Error('Enter a valid phone number'));
-                }}
-              ]}
-            >
-              <InputMask mask="(999) 999-9999" maskChar={null}>
-                {(inputProps) => <Input {...inputProps} placeholder="(555) 123-4567" />}
-              </InputMask>
-            </Form.Item>
-            <Form.Item 
-              label="Role" 
-              name="role" 
-              rules={[{ required: true }]}
-            >
-              <Select 
-                options={[{ value: 'Frontend' }, { value: 'Backend' }]} 
-                style={{ width: 200 }} 
-              />
-            </Form.Item>
-            <Button 
-              type="primary" 
-              onClick={onStart} 
-              loading={loading}
-              size="large"
-            >
-              Start Interview
-            </Button>
-          </Form>
+      <div className="interview-preview-container">
+        <div className="preview-header">
+          <h2>Interview Preview</h2>
+          <p>Review your interview details before starting</p>
         </div>
-      </div>
-    );
-  }
-
-  const question = activeSession.questions[activeSession.currentQuestionIndex];
-  const timer = timers[activeSession.id];
-  const isPaused = timer?.paused;
-
-  // Completion view
-  if (activeCandidate.status === 'completed') {
-    return (
-      <div className="video-interview-container">
-        <div className="completion-screen">
-          <h2>Interview Completed</h2>
-          <div className="score-display">
-            <div className="score-label">Your final score:</div>
-            <div className="score-value">{activeSession.score}</div>
-          </div>
-          <div className="summary">
-            <h3>Summary</h3>
-            <p>{activeSession.summary}</p>
-          </div>
-          <Button type="primary" onClick={() => window.location.reload()}>
-            Start New Interview
+        
+        <div className="preview-content">
+          <Card className="preview-card">
+            <div className="interview-info">
+              <div className="info-item">
+                <label>Name</label>
+                <span>{previewData.name}</span>
+              </div>
+              <div className="info-item">
+                <label>Email</label>
+                <span>{previewData.email}</span>
+              </div>
+              <div className="info-item">
+                <label>Phone</label>
+                <span>{previewData.phone}</span>
+              </div>
+              <div className="info-item">
+                <label>Role</label>
+                <span>{previewData.role}</span>
+              </div>
+            </div>
+          </Card>
+          
+          <Card 
+            className="preview-card"
+            title="Interview Questions"
+          >
+            {previewData.questions.map((question, index) => (
+              <div key={index} className="question-preview-item">
+                <div className="question-number">Question {index + 1}</div>
+                <div className="question-text">{question.text}</div>
+                <div className="question-meta">
+                  <span className={`difficulty ${question.difficulty.toLowerCase()}`}>
+                    {question.difficulty}
+                  </span>
+                  <span className="time-limit">{question.timeLimit}s</span>
+                </div>
+              </div>
+            ))}
+          </Card>
+        </div>
+        
+        <div className="preview-actions">
+          <Button onClick={() => setPreviewData(null)}>
+            Back to Form
+          </Button>
+          <Button 
+            type="primary" 
+            onClick={onStart}
+          >
+            Start Interview
           </Button>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="video-interview-container">
-      {!isSpeechRecognitionSupported && (
-        <div style={{ position: 'absolute', top: 20, left: 20, right: 20, zIndex: 1000 }}>
-          <Alert 
-            message="Speech Recognition Not Supported" 
-            description="Speech Recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge for the full AI experience." 
-            type="warning" 
-            showIcon 
-            closable
-          />
-        </div>
-      )}
-      
-      {/* AI Interviewer Avatar */}
-      <div className="ai-interviewer">
-        <AIAvatar isSpeaking={isSpeaking} />
-        {isSpeaking && <Waveform />}
-      </div>
-      
-      {/* Question Display */}
-      <div className="question-display">
-        <div className="question-header">
-          <span className="question-number">
-            Question {activeSession.currentQuestionIndex + 1} of {activeSession.questions.length}
-          </span>
-          <span className={`question-difficulty ${question.difficulty.toLowerCase()}`}>
-            {question.difficulty}
-          </span>
-        </div>
-        <div className="question-text">
-          {question.text}
-        </div>
-      </div>
-      
-      {/* Timer */}
-      <InterviewTimer 
-        timeLeft={timeLeft} 
-        totalTime={question.time} 
-        isRunning={!isPaused && isTimerRunning} 
-      />
-      
-      {/* Live Transcript */}
-      <div className="transcript-container">
-        <div className="transcript-header">
-          Your Answer
-        </div>
-        <div className="transcript-content">
-          {transcript || '[Start speaking to provide your answer]'}
-        </div>
-      </div>
-      
-      {/* Call Controls */}
-      <div className="call-controls">
-        <Button
-          type="ghost"
-          shape="circle"
-          icon={isMuted ? <AudioMutedOutlined /> : <AudioOutlined />}
-          onClick={toggleMute}
-          className="control-button mute-button"
+  // Show completion screen if interview is completed
+  if (activeSession && activeSession.status === 'completed') {
+    return (
+      <div className="completion-screen">
+        <Result
+          status="success"
+          title="Interview Completed!"
+          subTitle="Thank you for completing the interview. Your responses have been recorded."
         />
-        
-        <Button
-          type={isRecording ? "primary" : "ghost"}
-          shape="circle"
-          icon={isRecording ? <StopOutlined /> : <PhoneFilled />}
-          onClick={toggleRecording}
-          className={`control-button record-button ${isRecording ? 'recording' : ''}`}
-        />
-        
-        <Button
-          type="ghost"
-          shape="circle"
-          icon={isPaused ? <PlayCircleOutlined /> : <PauseOutlined />}
-          onClick={isPaused ? handleResume : handlePause}
-          className="control-button pause-button"
-        />
-        
-        <Button
-          type="ghost"
-          shape="circle"
-          icon={<PhoneFilled />}
-          onClick={handleEndCall}
-          className="control-button end-button"
-        />
-        
-        <Button
-          type="ghost"
-          onClick={handleSkip}
-          className="control-button skip-button"
-        >
-          Skip Question
+        <div className="score-display">
+          <div className="score-label">Your Score</div>
+          <div className="score-value">{activeSession.finalScore ?? 'N/A'}</div>
+        </div>
+        {activeSession.summary && (
+          <div className="summary">
+            <h3>Interview Summary</h3>
+            <p>{activeSession.summary}</p>
+          </div>
+        )}
+        <Button type="primary" size="large" onClick={() => window.location.reload()}>
+          Start New Interview
         </Button>
       </div>
-      
-      {/* User Webcam */}
-      <div className="user-webcam">
-        <Webcam
-          audio={false}
-          ref={webcamRef}
-          screenshotFormat="image/jpeg"
-          videoConstraints={{ facingMode: "user" }}
+    );
+  }
+
+  // Show question view if we have an active session
+  if (activeSession && activeSession.status === 'in-progress') {
+    return (
+      <InterviewQuestionView
+        session={activeSession}
+        transcript={transcript}
+        setTranscript={setTranscript}
+        isRecording={isRecording}
+        isSpeechRecognitionSupported={isSpeechRecognitionSupported}
+        toggleRecording={toggleRecording}
+        timeLeft={timeLeft}
+        isTimerRunning={isTimerRunning}
+        isTimerPaused={isTimerPaused}
+        pauseTimer={pauseTimer}
+        resumeTimer={resumeTimer}
+        handleSubmitAnswer={handleSubmitAnswer}
+        showReview={showReview}
+        setShowReview={setShowReview}
+        reviewAnswer={reviewAnswer}
+        setReviewAnswer={setReviewAnswer}
+        debouncedSaveDraft={debouncedSaveDraft}
+      />
+    );
+  }
+
+  // Show setup form by default
+  return (
+    <div className="interview-setup-container">
+      <div className="setup-card">
+        <h2>
+          <VideoCameraOutlined style={{ marginRight: 12 }} />
+          AI Interview Assistant
+        </h2>
+        <p style={{ textAlign: 'center', marginBottom: 30, color: 'rgba(255,255,255,0.7)' }}>
+          Prepare for your interview with our AI-powered assistant. 
+          Please fill in your details to get started.
+        </p>
+        
+        {errors.startInterview && (
+          <div style={{ marginBottom: 20 }}>
+            <Result
+              status="error"
+              title="Failed to Start Interview"
+              subTitle={errors.startInterview}
+              extra={[
+                <Button 
+                  type="primary" 
+                  key="retry" 
+                  onClick={onStart}
+                  icon={<RedoOutlined />}
+                >
+                  Retry
+                </Button>
+              ]}
+            />
+          </div>
+        )}
+        
+        <InterviewSetupForm
+          form={form}
+          prefill={prefill}
+          setPrefill={setPrefill}
+          onStart={onStart}
+          showPreview={showPreview}
+          setShowPreview={setShowPreview}
+          loading={loadingStates.startInterview}
         />
       </div>
-      
-      {/* Loading overlay */}
-      {loading && (
-        <div className="loading-overlay">
-          <Spin size="large" tip="Processing answer..." />
-        </div>
-      )}
     </div>
   );
 }

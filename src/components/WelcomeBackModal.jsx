@@ -1,28 +1,31 @@
-import React, { useMemo, useState } from 'react';
-import { Modal } from 'antd';
-import { useDispatch, useSelector } from 'react-redux';
-import { abandonActiveInterview, resumeTimerIfNeeded } from '../features/interview/interviewSlice.js';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Modal, message } from 'antd';
+import { useInterview } from '../contexts/InterviewContext.jsx';
 
 export default function WelcomeBackModal() {
-  const dispatch = useDispatch();
-  const { candidates, activeCandidateId } = useSelector(s => s.interview);
-  const activeCandidate = useMemo(() => candidates.find(c => c.id === activeCandidateId), [candidates, activeCandidateId]);
-  const shouldShow = !!(activeCandidate && activeCandidate.status === 'in-progress');
+  const { 
+    activeCandidate, 
+    activeSession,
+    abandonActiveInterview
+  } = useInterview();
+  
+  const shouldShow = useMemo(() => {
+    return !!(activeSession && activeCandidate && activeCandidate.status === 'in-progress');
+  }, [activeSession, activeCandidate]);
+
   const [visible, setVisible] = useState(shouldShow);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setVisible(shouldShow);
   }, [shouldShow]);
 
   const onResume = () => {
-    if (activeCandidateId) {
-      dispatch(resumeTimerIfNeeded({ candidateId: activeCandidateId }));
-    }
+    // Timer logic is now handled locally in the IntervieweeView component
     setVisible(false);
   };
 
   const onStartNew = () => {
-    dispatch(abandonActiveInterview());
+    abandonActiveInterview();
     setVisible(false);
   };
 
@@ -41,5 +44,3 @@ export default function WelcomeBackModal() {
     </Modal>
   );
 }
-
-

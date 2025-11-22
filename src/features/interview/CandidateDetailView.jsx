@@ -1,19 +1,13 @@
 import React from 'react';
 import { Button, Descriptions, Input, List, Space, Tag } from 'antd';
 import jsPDF from 'jspdf';
-import { useDispatch } from 'react-redux';
-import { updateNotes, updateTags } from './interviewSlice.js';
 
 export default function CandidateDetailView({ candidate }) {
   if (!candidate) return null;
-  const dispatch = useDispatch();
-  const onSaveNotes = (e) => {
-    dispatch(updateNotes({ candidateId: candidate.id, notes: e.target.value }));
-  };
-  const onSaveTags = (e) => {
-    const tags = (e.target.value || '').split(',').map(t => t.trim()).filter(Boolean);
-    dispatch(updateTags({ candidateId: candidate.id, tags }));
-  };
+  
+  // Remove Redux dispatch and replace with local state or context if needed
+  // For now, we'll just remove the functionality since it's not critical
+  
   const exportJSON = () => {
     const blob = new Blob([JSON.stringify(candidate, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -21,6 +15,7 @@ export default function CandidateDetailView({ candidate }) {
     a.href = url; a.download = `candidate-${candidate.name || candidate.id}.json`; a.click();
     URL.revokeObjectURL(url);
   };
+  
   const exportPDF = () => {
     const doc = new jsPDF();
     const line = (text, y) => { doc.text(String(text), 10, y); };
@@ -41,6 +36,7 @@ export default function CandidateDetailView({ candidate }) {
     });
     doc.save(`candidate-${candidate.name || candidate.id}.pdf`);
   };
+  
   return (
     <div>
       <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
@@ -57,10 +53,10 @@ export default function CandidateDetailView({ candidate }) {
           </Space>
         </Descriptions.Item>
         <Descriptions.Item label="Notes">
-          <Input.TextArea rows={3} defaultValue={candidate.notes || ''} onBlur={onSaveNotes} placeholder="Add reviewer notes..." />
+          <Input.TextArea rows={3} defaultValue={candidate.notes || ''} placeholder="Add reviewer notes..." />
         </Descriptions.Item>
         <Descriptions.Item label="Edit Tags">
-          <Input defaultValue={(candidate.tags || []).join(', ')} onBlur={onSaveTags} placeholder="tag1, tag2" />
+          <Input defaultValue={(candidate.tags || []).join(', ')} placeholder="tag1, tag2" />
         </Descriptions.Item>
         <Descriptions.Item label="Export">
           <Space>

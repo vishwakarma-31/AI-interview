@@ -1,0 +1,9 @@
+import React from 'react';
+
+export interface ToastContextType {
+  addToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', duration?: number) => void;
+  removeToast: (id: number) => void;
+}
+
+export const ToastProvider: React.ComponentType<{ children: React.ReactNode }>;
+export const useToast: () => ToastContextType;

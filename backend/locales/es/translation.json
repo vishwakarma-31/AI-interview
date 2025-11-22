@@ -1,0 +1,29 @@
+{
+  "welcome": "Bienvenido al Asistente de Entrevistas de IA",
+  "interview": {
+    "title": "Entrevista",
+    "start": "Comenzar Entrevista",
+    "complete": "Completar Entrevista",
+    "questions": "Preguntas",
+    "score": "Puntuación"
+  },
+  "candidate": {
+    "name": "Nombre del Candidato",
+    "email": "Dirección de Correo Electrónico",
+    "phone": "Número de Teléfono",
+    "role": "Rol",
+    "list_success": "Candidatos recuperados exitosamente"
+  },
+  "errors": {
+    "invalid_email": "Por favor ingrese una dirección de correo electrónico válida",
+    "required_field": "Este campo es obligatorio",
+    "min_length": "Este campo debe tener al menos {{count}} caracteres"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "submit": "Enviar"
+  }
+}

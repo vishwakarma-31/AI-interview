@@ -5,7 +5,8 @@ const IntervieweeView = lazy(() => import('./features/interview/IntervieweeView.
 const InterviewerDashboard = lazy(() => import('./features/interview/InterviewerDashboard.jsx'));
 import WelcomeBackModal from './components/WelcomeBackModal.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import { useSelector } from 'react-redux';
+import GlobalErrorToast from './components/GlobalErrorToast.jsx';
+import { ToastProvider } from './components/ToastContainer.jsx';
 
 const { Header, Content } = Layout;
 
@@ -32,6 +33,7 @@ function AppShell() {
         <Menu theme="dark" mode="horizontal" selectedKeys={[tabKey]} items={items} onClick={(e) => navigate(e.key)} />
       </Header>
       <Content style={{ padding: 24 }}>
+        <GlobalErrorToast />
         <ErrorBoundary>
           <Suspense fallback={<div />}> 
             <Routes>
@@ -50,9 +52,9 @@ function AppShell() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppShell />
+      <ToastProvider>
+        <AppShell />
+      </ToastProvider>
     </BrowserRouter>
   );
 }
-
-

@@ -1,0 +1,1467 @@
+openapi: 3.0.3
+info:
+  title: AI Interview Assistant API
+  description: API for the AI Interview Assistant application
+  version: 1.0.0
+  contact:
+    name: AI Interview Assistant Team
+    email: support@ai-interview-assistant.org
+    url: https://github.com/your-org/ai-interview-assistant
+  license:
+    name: MIT
+    url: https://github.com/your-org/ai-interview-assistant/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Development server
+  - url: https://api.ai-interview-assistant.org/api/v1
+    description: Production server
+
+paths:
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticate a user and return JWT tokens
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+              required:
+                - email
+                - password
+            examples:
+              login_example:
+                summary: Example login request
+                value:
+                  email: user@example.com
+                  password: securePassword123
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      accessToken:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refreshToken:
+                        type: string
+                        example: "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4..."
+              examples:
+                login_success:
+                  summary: Successful login response
+                  value:
+                    success: true
+                    message: Authentication successful
+                    data:
+                      user:
+                        id: "507f1f77bcf86cd799439011"
+                        name: John Doe
+                        email: user@example.com
+                        role: interviewer
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                      accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refreshToken: "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4..."
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/register:
+    post:
+      summary: User registration
+      description: Register a new user account
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+                role:
+                  type: string
+                  enum: [admin, interviewer, candidate]
+                  example: interviewer
+              required:
+                - name
+                - email
+                - password
+                - role
+            examples:
+              register_example:
+                summary: Example registration request
+                value:
+                  name: John Doe
+                  email: user@example.com
+                  password: securePassword123
+                  role: interviewer
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+              examples:
+                register_success:
+                  summary: Successful registration response
+                  value:
+                    success: true
+                    message: User created successfully
+                    data:
+                      user:
+                        id: "507f1f77bcf86cd799439011"
+                        name: John Doe
+                        email: user@example.com
+                        role: interviewer
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                    statusCode: 201
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /interview/start:
+    post:
+      summary: Start a new interview
+      description: Initialize a new interview session for a candidate
+      tags:
+        - Interview
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Jane Smith
+                email:
+                  type: string
+                  format: email
+                  example: jane@example.com
+                phone:
+                  type: string
+                  example: "+1 (555) 123-4567"
+                role:
+                  type: string
+                  example: Frontend Developer
+                resume:
+                  type: string
+                  format: binary
+              required:
+                - name
+                - email
+                - phone
+                - role
+            examples:
+              start_interview_example:
+                summary: Example interview start request
+                value:
+                  name: Jane Smith
+                  email: jane@example.com
+                  phone: "+1 (555) 123-4567"
+                  role: Frontend Developer
+      responses:
+        '200':
+          description: Interview started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      candidate:
+                        $ref: '#/components/schemas/Candidate'
+                      session:
+                        $ref: '#/components/schemas/InterviewSession'
+              examples:
+                start_interview_success:
+                  summary: Successful interview start response
+                  value:
+                    success: true
+                    message: Interview started successfully
+                    data:
+                      candidate:
+                        id: "507f1f77bcf86cd799439011"
+                        name: Jane Smith
+                        email: jane@example.com
+                        phone: "+1 (555) 123-4567"
+                        role: Frontend Developer
+                        resumeText: "Experienced frontend developer with 5 years of React experience..."
+                        status: in-progress
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                      session:
+                        id: "507f1f77bcf86cd799439012"
+                        candidateId: "507f1f77bcf86cd799439011"
+                        questions:
+                          - id: "507f1f77bcf86cd799439013"
+                            text: "Explain the concept of React hooks and their advantages."
+                            difficulty: medium
+                            category: React
+                            timeLimit: 120
+                            answer: ""
+                            draft: ""
+                            score: 0
+                        currentQuestionIndex: 0
+                        score: 0
+                        summary: ""
+                        status: in-progress
+                        startedAt: "2023-01-01T00:00:00.000Z"
+                        completedAt: null
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                    statusCode: 201
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /scheduling/schedule:
+    post:
+      summary: Schedule an interview
+      description: Schedule an interview for a candidate
+      tags:
+        - Scheduling
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                candidateId:
+                  type: string
+                  example: "507f1f77bcf86cd799439011"
+                scheduledAt:
+                  type: string
+                  format: date-time
+                  example: "2023-12-01T10:00:00.000Z"
+                duration:
+                  type: integer
+                  example: 60
+                  description: Duration in minutes
+                timezone:
+                  type: string
+                  example: "America/New_York"
+                  description: Timezone for the scheduled interview
+              required:
+                - candidateId
+                - scheduledAt
+                - duration
+            examples:
+              schedule_interview_example:
+                summary: Example schedule interview request
+                value:
+                  candidateId: "507f1f77bcf86cd799439011"
+                  scheduledAt: "2023-12-01T10:00:00.000Z"
+                  duration: 60
+                  timezone: "America/New_York"
+      responses:
+        '201':
+          description: Interview scheduled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      candidate:
+                        $ref: '#/components/schemas/Candidate'
+              examples:
+                schedule_interview_success:
+                  summary: Successful interview scheduling response
+                  value:
+                    success: true
+                    message: Interview scheduled successfully
+                    data:
+                      candidate:
+                        id: "507f1f77bcf86cd799439011"
+                        name: Jane Smith
+                        email: jane@example.com
+                        phone: "+1 (555) 123-4567"
+                        role: Frontend Developer
+                        status: scheduled
+                        scheduledAt: "2023-12-01T10:00:00.000Z"
+                        scheduledDuration: 60
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                    statusCode: 201
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /scheduling/upcoming:
+    get:
+      summary: Get upcoming scheduled interviews
+      description: Get a list of upcoming scheduled interviews
+      tags:
+        - Scheduling
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: candidateId
+          in: query
+          schema:
+            type: string
+          description: Filter by candidate ID
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [scheduled, completed, cancelled]
+          description: Filter by status
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter from date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter to date
+        - name: timezone
+          in: query
+          schema:
+            type: string
+            example: "America/New_York"
+          description: Timezone for date filtering
+      responses:
+        '200':
+          description: Upcoming interviews retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Candidate'
+              examples:
+                get_upcoming_success:
+                  summary: Successful upcoming interviews response
+                  value:
+                    success: true
+                    message: Upcoming interviews retrieved successfully
+                    data:
+                      - id: "507f1f77bcf86cd799439011"
+                        name: Jane Smith
+                        email: jane@example.com
+                        phone: "+1 (555) 123-4567"
+                        role: Frontend Developer
+                        status: scheduled
+                        scheduledAt: "2023-12-01T10:00:00.000Z"
+                        scheduledDuration: 60
+                        timezone: "America/New_York"
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /scheduling/timezones:
+    get:
+      summary: Get supported timezones
+      description: Get a list of supported timezones for scheduling interviews
+      tags:
+        - Scheduling
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Supported timezones retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      timezones:
+                        type: array
+                        items:
+                          type: string
+                        example: ["UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"]
+                      count:
+                        type: integer
+                        example: 5
+              examples:
+                get_timezones_success:
+                  summary: Successful timezones response
+                  value:
+                    success: true
+                    message: Supported timezones retrieved successfully
+                    data:
+                      timezones: ["UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"]
+                      count: 5
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /scheduling/{id}/cancel:
+    patch:
+      summary: Cancel a scheduled interview
+      description: Cancel a scheduled interview
+      tags:
+        - Scheduling
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        '200':
+          description: Interview cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      candidate:
+                        $ref: '#/components/schemas/Candidate'
+              examples:
+                cancel_interview_success:
+                  summary: Successful interview cancellation response
+                  value:
+                    success: true
+                    message: Interview cancelled successfully
+                    data:
+                      candidate:
+                        id: "507f1f77bcf86cd799439011"
+                        name: Jane Smith
+                        email: jane@example.com
+                        phone: "+1 (555) 123-4567"
+                        role: Frontend Developer
+                        status: pending
+                        scheduledAt: null
+                        scheduledDuration: null
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /scheduling/{id}/reschedule:
+    patch:
+      summary: Reschedule an interview
+      description: Reschedule an existing interview
+      tags:
+        - Scheduling
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scheduledAt:
+                  type: string
+                  format: date-time
+                  example: "2023-12-01T10:00:00.000Z"
+                duration:
+                  type: integer
+                  example: 60
+                  description: Duration in minutes
+                timezone:
+                  type: string
+                  example: "America/New_York"
+                  description: Timezone for the rescheduled interview
+              required:
+                - scheduledAt
+                - duration
+            examples:
+              reschedule_interview_example:
+                summary: Example reschedule interview request
+                value:
+                  scheduledAt: "2023-12-01T10:00:00.000Z"
+                  duration: 60
+                  timezone: "America/New_York"
+      responses:
+        '200':
+          description: Interview rescheduled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      candidate:
+                        $ref: '#/components/schemas/Candidate'
+              examples:
+                reschedule_interview_success:
+                  summary: Successful interview rescheduling response
+                  value:
+                    success: true
+                    message: Interview rescheduled successfully
+                    data:
+                      candidate:
+                        id: "507f1f77bcf86cd799439011"
+                        name: Jane Smith
+                        email: jane@example.com
+                        phone: "+1 (555) 123-4567"
+                        role: Frontend Developer
+                        status: scheduled
+                        scheduledAt: "2023-12-01T10:00:00.000Z"
+                        scheduledDuration: 60
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:00:00.000Z"
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /interview/{id}:
+    patch:
+      summary: Submit an answer
+      description: Submit a candidate's answer and get the next question or final results
+      tags:
+        - Interview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                answerText:
+                  type: string
+                  example: "This is my answer to the technical question."
+              required:
+                - answerText
+            examples:
+              submit_answer_example:
+                summary: Example answer submission request
+                value:
+                  answerText: "React hooks are functions that allow you to use state and other React features without writing a class component. They provide a more functional approach to React development."
+      responses:
+        '200':
+          description: Answer submitted successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: true
+                      data:
+                        type: object
+                        properties:
+                          nextQuestion:
+                            type: object
+                            properties:
+                              index:
+                                type: integer
+                                example: 1
+                              question:
+                                $ref: '#/components/schemas/Question'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: true
+                      data:
+                        type: object
+                        properties:
+                          finalScore:
+                            type: integer
+                            example: 85
+                          summary:
+                            type: string
+                            example: "Candidate performed well overall with strong technical knowledge."
+                          questions:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/QuestionWithScore'
+              examples:
+                next_question_response:
+                  summary: Next question response
+                  value:
+                    success: true
+                    message: Answer submitted successfully
+                    data:
+                      nextQuestion:
+                        index: 1
+                        question:
+                          id: "507f1f77bcf86cd799439014"
+                          text: "How would you optimize the performance of a React application?"
+                          difficulty: hard
+                          category: React
+                          timeLimit: 180
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:05:00.000Z"
+                final_results_response:
+                  summary: Final results response
+                  value:
+                    success: true
+                    message: Interview completed
+                    data:
+                      finalScore: 85
+                      summary: "Candidate performed well overall with strong technical knowledge."
+                      questions:
+                        - question:
+                            id: "507f1f77bcf86cd799439013"
+                            text: "Explain the concept of React hooks and their advantages."
+                            difficulty: medium
+                            category: React
+                            timeLimit: 120
+                          answer: "React hooks are functions that allow you to use state and other React features without writing a class component."
+                          score: 80
+                          feedback: "Good explanation of React hooks. Consider mentioning useCallback and useMemo."
+                        - question:
+                            id: "507f1f77bcf86cd799439014"
+                            text: "How would you optimize the performance of a React application?"
+                            difficulty: hard
+                            category: React
+                            timeLimit: 180
+                          answer: "I would use React.memo, useMemo, and useCallback to prevent unnecessary re-renders."
+                          score: 90
+                          feedback: "Excellent answer with specific optimization techniques."
+                    statusCode: 200
+                    timestamp: "2023-01-01T01:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      summary: Get interview details
+      description: Retrieve details of a specific interview session
+      tags:
+        - Interview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        '200':
+          description: Interview details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/InterviewSession'
+              examples:
+                get_interview_success:
+                  summary: Successful interview retrieval response
+                  value:
+                    success: true
+                    message: Interview session retrieved successfully
+                    data:
+                      session:
+                        id: "507f1f77bcf86cd799439012"
+                        candidateId: "507f1f77bcf86cd799439011"
+                        questions:
+                          - id: "507f1f77bcf86cd799439013"
+                            text: "Explain the concept of React hooks and their advantages."
+                            difficulty: medium
+                            category: React
+                            timeLimit: 120
+                            answer: "React hooks are functions that allow you to use state and other React features without writing a class component."
+                            draft: ""
+                            score: 80
+                          - id: "507f1f77bcf86cd799439014"
+                            text: "How would you optimize the performance of a React application?"
+                            difficulty: hard
+                            category: React
+                            timeLimit: 180
+                            answer: ""
+                            draft: ""
+                            score: 0
+                        currentQuestionIndex: 1
+                        score: 80
+                        summary: ""
+                        status: in-progress
+                        startedAt: "2023-01-01T00:00:00.000Z"
+                        completedAt: null
+                        createdAt: "2023-01-01T00:00:00.000Z"
+                        updatedAt: "2023-01-01T00:05:00.000Z"
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:05:00.000Z"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Delete interview
+      description: Delete an interview session
+      tags:
+        - Interview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        '200':
+          description: Interview deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Interview session deleted successfully"
+              examples:
+                delete_interview_success:
+                  summary: Successful interview deletion response
+                  value:
+                    success: true
+                    message: "Interview session deleted successfully"
+                    statusCode: 200
+                    timestamp: "2023-01-01T02:00:00.000Z"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /candidates:
+    get:
+      summary: Get all candidates
+      description: Retrieve a list of all candidates with their interview sessions
+      tags:
+        - Candidates
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            example: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            example: 0
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, in-progress, completed, abandoned]
+        - name: role
+          in: query
+          schema:
+            type: string
+            example: Frontend Developer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            example: score
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            example: desc
+      responses:
+        '200':
+          description: Candidates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CandidateWithSessions'
+              examples:
+                get_candidates_success:
+                  summary: Successful candidates retrieval response
+                  value:
+                    success: true
+                    message: Candidates retrieved successfully
+                    data:
+                      - candidate:
+                          id: "507f1f77bcf86cd799439011"
+                          name: Jane Smith
+                          email: jane@example.com
+                          phone: "+1 (555) 123-4567"
+                          role: Frontend Developer
+                          resumeText: "Experienced frontend developer with 5 years of React experience..."
+                          status: completed
+                          createdAt: "2023-01-01T00:00:00.000Z"
+                          updatedAt: "2023-01-01T01:00:00.000Z"
+                        sessions:
+                          - id: "507f1f77bcf86cd799439012"
+                            candidateId: "507f1f77bcf86cd799439011"
+                            questions:
+                              - question:
+                                  id: "507f1f77bcf86cd799439013"
+                                  text: "Explain the concept of React hooks and their advantages."
+                                  difficulty: medium
+                                  category: React
+                                  timeLimit: 120
+                                answer: "React hooks are functions that allow you to use state and other React features without writing a class component."
+                                score: 80
+                                feedback: "Good explanation of React hooks. Consider mentioning useCallback and useMemo."
+                              - question:
+                                  id: "507f1f77bcf86cd799439014"
+                                  text: "How would you optimize the performance of a React application?"
+                                  difficulty: hard
+                                  category: React
+                                  timeLimit: 180
+                                answer: "I would use React.memo, useMemo, and useCallback to prevent unnecessary re-renders."
+                                score: 90
+                                feedback: "Excellent answer with specific optimization techniques."
+                            currentQuestionIndex: 2
+                            score: 85
+                            summary: "Candidate performed well overall with strong technical knowledge."
+                            status: completed
+                            startedAt: "2023-01-01T00:00:00.000Z"
+                            completedAt: "2023-01-01T01:00:00.000Z"
+                            createdAt: "2023-01-01T00:00:00.000Z"
+                            updatedAt: "2023-01-01T01:00:00.000Z"
+                    statusCode: 200
+                    timestamp: "2023-01-01T02:00:00.000Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /interview/{id}/question/{questionId}/score:
+    patch:
+      summary: Adjust question score
+      description: Manually adjust the score for a specific question in an interview session
+      tags:
+        - Interview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+          description: Interview session ID
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439013"
+          description: Question ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newScore:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  example: 85
+                  description: New score for the question
+                reason:
+                  type: string
+                  maxLength: 500
+                  example: "Adjusted for exceptional answer quality"
+                  description: Reason for score adjustment
+              required:
+                - newScore
+            examples:
+              adjust_score_example:
+                summary: Example score adjustment request
+                value:
+                  newScore: 95
+                  reason: "Exceptional answer with comprehensive examples"
+      responses:
+        '200':
+          description: Score adjusted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      question:
+                        $ref: '#/components/schemas/QuestionWithScore'
+                      sessionScore:
+                        type: integer
+                        example: 87
+                      sessionWeightedScore:
+                        type: integer
+                        example: 89
+                  message:
+                    type: string
+                    example: "Question score adjusted successfully"
+                  statusCode:
+                    type: integer
+                    example: 200
+                  timestamp:
+                    type: string
+                    example: "2023-01-01T00:00:00.000Z"
+              examples:
+                adjust_score_success:
+                  summary: Successful score adjustment response
+                  value:
+                    success: true
+                    message: Question score adjusted successfully
+                    data:
+                      question:
+                        question:
+                          id: "507f1f77bcf86cd799439013"
+                          text: "Explain the concept of React hooks and their advantages."
+                          difficulty: medium
+                          category: React
+                          timeLimit: 120
+                        answer: "React hooks are functions that allow you to use state and other React features without writing a class component."
+                        score: 95
+                        feedback: "Good explanation of React hooks. Consider mentioning useCallback and useMemo."
+                      sessionScore: 87
+                      sessionWeightedScore: 89
+                    statusCode: 200
+                    timestamp: "2023-01-01T00:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        role:
+          type: string
+          enum: [admin, interviewer, candidate]
+          example: interviewer
+        createdAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00.000Z"
+
+    Candidate:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+        name:
+          type: string
+          example: Jane Smith
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        phone:
+          type: string
+          example: "+1 (555) 123-4567"
+        role:
+          type: string
+          example: Frontend Developer
+        resumeText:
+          type: string
+          example: "Experienced frontend developer with 5 years of React experience..."
+        status:
+          type: string
+          enum: [pending, scheduled, in-progress, completed, abandoned]
+          example: in-progress
+        scheduledAt:
+          type: string
+          format: date-time
+          example: "2023-12-01T10:00:00.000Z"
+        scheduledDuration:
+          type: integer
+          example: 60
+        timezone:
+          type: string
+          example: "America/New_York"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00.000Z"
+
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "507f1f77bcf86cd799439012"
+        text:
+          type: string
+          example: "Explain the concept of React hooks and their advantages."
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+          example: medium
+        category:
+          type: string
+          example: React
+        timeLimit:
+          type: integer
+          example: 120
+
+    QuestionWithScore:
+      type: object
+      properties:
+        question:
+          $ref: '#/components/schemas/Question'
+        answer:
+          type: string
+          example: "This is the candidate's answer to the question."
+        score:
+          type: integer
+          example: 85
+        feedback:
+          type: string
+          example: "Good explanation of React hooks. Consider mentioning useCallback and useMemo."
+        adjustments:
+          type: array
+          items:
+            type: object
+            properties:
+              originalScore:
+                type: integer
+              adjustedScore:
+                type: integer
+              reason:
+                type: string
+              adjustedBy:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+              adjustedAt:
+                type: string
+                format: date-time
+              isManualAdjustment:
+                type: boolean
+
+    InterviewSession:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "507f1f77bcf86cd799439013"
+        candidateId:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionWithScore'
+        currentQuestionIndex:
+          type: integer
+          example: 2
+        score:
+          type: integer
+          example: 85
+        summary:
+          type: string
+          example: "Candidate performed well overall with strong technical knowledge."
+        status:
+          type: string
+          enum: [pending, in-progress, completed, abandoned]
+          example: completed
+        startedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00.000Z"
+        completedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T01:00:00.000Z"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T00:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2023-01-01T01:00:00.000Z"
+
+    CandidateWithSessions:
+      type: object
+      properties:
+        candidate:
+          $ref: '#/components/schemas/Candidate'
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/InterviewSession'
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "VALID_001"
+                  message:
+                    type: string
+                    example: "Validation failed"
+                  statusCode:
+                    type: integer
+                    example: 400
+                  timestamp:
+                    type: string
+                    example: "2023-01-01T00:00:00.000Z"
+          examples:
+            bad_request_example:
+              summary: Bad request response example
+              value:
+                success: false
+                error:
+                  code: VALID_001
+                  message: Validation failed
+                  statusCode: 400
+                  timestamp: "2023-01-01T00:00:00.000Z"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "AUTH_003"
+                  message:
+                    type: string
+                    example: "Invalid token"
+                  statusCode:
+                    type: integer
+                    example: 401
+                  timestamp:
+                    type: string
+                    example: "2023-01-01T00:00:00.000Z"
+          examples:
+            unauthorized_example:
+              summary: Unauthorized response example
+              value:
+                success: false
+                error:
+                  code: AUTH_003
+                  message: Invalid token
+                  statusCode: 401
+                  timestamp: "2023-01-01T00:00:00.000Z"
+
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "DB_002"
+                  message:
+                    type: string
+                    example: "Resource not found"
+                  statusCode:
+                    type: integer
+                    example: 404
+                  timestamp:
+                    type: string
+                    example: "2023-01-01T00:00:00.000Z"
+          examples:
+            not_found_example:
+              summary: Not found response example
+              value:
+                success: false
+                error:
+                  code: DB_002
+                  message: Resource not found
+                  statusCode: 404
+                  timestamp: "2023-01-01T00:00:00.000Z"
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "DB_003"
+                  message:
+                    type: string
+                    example: "Duplicate entry"
+                  statusCode:
+                    type: integer
+                    example: 409
+                  timestamp:
+                    type: string
+                    example: "2023-01-01T00:00:00.000Z"
+          examples:
+            conflict_example:
+              summary: Conflict response example
+              value:
+                success: false
+                error:
+                  code: DB_003
+                  message: Duplicate entry
+                  statusCode: 409
+                  timestamp: "2023-01-01T00:00:00.000Z"
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "GEN_001"
+                  message:
+                    type: string
+                    example: "Internal server error"
+                  statusCode:
+                    type: integer
+                    example: 500
+                  timestamp:
+                    type: string
+                    example: "2023-01-01T00:00:00.000Z"
+          examples:
+            internal_server_error_example:
+              summary: Internal server error response example
+              value:
+                success: false
+                error:
+                  code: GEN_001
+                  message: Internal server error
+                  statusCode: 500
+                  timestamp: "2023-01-01T00:00:00.000Z"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Interview
+    description: Interview session management endpoints
+  - name: Candidates
+    description: Candidate management endpoints

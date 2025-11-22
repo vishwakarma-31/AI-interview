@@ -1,0 +1,29 @@
+{
+  "welcome": "欢迎使用AI面试助手",
+  "interview": {
+    "title": "面试",
+    "start": "开始面试",
+    "complete": "完成面试",
+    "questions": "问题",
+    "score": "分数"
+  },
+  "candidate": {
+    "name": "候选人姓名",
+    "email": "电子邮件地址",
+    "phone": "电话号码",
+    "role": "角色",
+    "list_success": "候选人获取成功"
+  },
+  "errors": {
+    "invalid_email": "请输入有效的电子邮件地址",
+    "required_field": "此字段为必填项",
+    "min_length": "此字段必须至少包含{{count}}个字符"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "submit": "提交"
+  }
+}

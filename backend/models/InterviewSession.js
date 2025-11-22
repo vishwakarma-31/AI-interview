@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
 
 const questionSchema = new mongoose.Schema({
   text: {
@@ -25,7 +26,47 @@ const questionSchema = new mongoose.Schema({
   score: {
     type: Number,
     default: 0
-  }
+  },
+  category: {
+    type: String,
+    default: 'Technical'
+  },
+  tags: [{
+    type: String
+  }],
+  isCustom: {
+    type: Boolean,
+    default: false
+  },
+  weight: {
+    type: Number,
+    default: 1.0
+  },
+  adjustments: [{
+    originalScore: {
+      type: Number,
+      required: true
+    },
+    adjustedScore: {
+      type: Number,
+      required: true
+    },
+    reason: {
+      type: String
+    },
+    adjustedBy: {
+      id: String,
+      name: String
+    },
+    adjustedAt: {
+      type: Date,
+      default: Date.now
+    },
+    isManualAdjustment: {
+      type: Boolean,
+      default: true
+    }
+  }]
 });
 
 const interviewSessionSchema = new mongoose.Schema({
@@ -33,6 +74,11 @@ const interviewSessionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Candidate',
     required: true
+  },
+  organization: {
+    type: String,
+    ref: 'Organization',
+    required: false
   },
   questions: [questionSchema],
   currentQuestionIndex: {
@@ -43,6 +89,13 @@ const interviewSessionSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  weightedScore: {
+    type: Number,
+    default: 0
+  },
+  scoreBreakdown: [{
+    type: mongoose.Schema.Types.Mixed
+  }],
   summary: {
     type: String,
     default: ''
@@ -77,13 +130,30 @@ const interviewSessionSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date
   }
 });
 
-// Update the updatedAt field before saving
+// Generate UUID if not provided
 interviewSessionSchema.pre('save', function(next) {
+  if (!this._id) {
+    this._id = uuidv4();
+  }
   this.updatedAt = Date.now();
   next();
 });
+
+// Create indexes
+interviewSessionSchema.index({ candidateId: 1 });
+interviewSessionSchema.index({ createdAt: 1 });
+interviewSessionSchema.index({ score: 1 });
+interviewSessionSchema.index({ candidateId: 1, createdAt: -1 });
+interviewSessionSchema.index({ organization: 1 });
 
 module.exports = mongoose.model('InterviewSession', interviewSessionSchema);

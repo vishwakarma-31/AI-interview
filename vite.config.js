@@ -6,6 +6,24 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true
+  },
+  build: {
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+    // Reduce chunk size warnings
+    chunkSizeWarningLimit: 1000,
+    // Optimize dependencies
+    rollupOptions: {
+      output: {
+        // Separate vendor chunks for better caching
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'router-vendor': ['react-router-dom'],
+          'antd-vendor': ['antd'],
+          'framer-motion': ['framer-motion'],
+          'pdf-vendor': ['jspdf']
+        }
+      }
+    }
   }
 });
-

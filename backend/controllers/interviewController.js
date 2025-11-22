@@ -1,36 +1,27 @@
 const Candidate = require('../models/Candidate');
 const InterviewSession = require('../models/InterviewSession');
-const { parsePDF, parseDOCX, generateQuestions, gradeAnswer, generateSummary } = require('../services/aiService');
+const { parsePDF, parseDOCX, generateQuestions, gradeAnswer, generateSummary, fallbackQuestions, fallbackGrade, fallbackSummary } = require('../services/aiService');
+const { generateConfigurableQuestions, addCustomQuestions } = require('../services/questionService');
+const { calculateFinalScore, applyPartialCredit, adjustScoreManually } = require('../services/scoringService');
 const path = require('path');
-const { setInMemoryStorage } = require('./candidateController');
 const mongoose = require('mongoose');
-
-// In-memory storage for demonstration purposes when MongoDB is not available
-let inMemoryCandidates = [];
-let inMemorySessions = [];
-let nextId = 1;
-
-// Set the in-memory storage in candidate controller
-setInMemoryStorage(inMemoryCandidates, inMemorySessions);
-
-function generateId() {
-  return `id_${nextId++}`;
-}
+const { AppError, formatSuccessResponse } = require('../middleware/errorHandler');
+const crypto = require('crypto');
+const { logAuditEvent } = require('../utils/auditLogger');
 
 /**
  * Start a new interview session
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-async function startInterview(req, res) {
+async function startInterview(req, res, next) {
+  let session; // Declare session outside try block for use in catch
   try {
-    const { name, email, phone, role } = req.body;
+    const { name, email, phone, role, gdprConsent, questionCount, customQuestions } = req.body;
     
     // Validate required fields
     if (!name || !email || !phone || !role) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: name, email, phone, role' 
-      });
+      throw new AppError('Missing required fields: name, email, phone, role', 400, 'VALID_004');
     }
     
     let resumeText = '';
@@ -39,52 +30,85 @@ async function startInterview(req, res) {
     if (req.file) {
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
       
+      // Additional security check for file extension
+      if (fileExtension !== '.pdf' && fileExtension !== '.docx') {
+        throw new AppError('Invalid file format. Only PDF and DOCX files are supported.', 400, 'FILE_001');
+      }
+      
       if (fileExtension === '.pdf') {
         resumeText = await parsePDF(req.file.buffer);
       } else if (fileExtension === '.docx') {
         resumeText = await parseDOCX(req.file.buffer);
-      } else {
-        return res.status(400).json({ 
-          error: 'Invalid file format. Only PDF and DOCX files are supported.' 
-        });
       }
     }
     
     // Check if database is connected
     const isDatabaseConnected = mongoose.connection.readyState === 1;
     
-    let candidate, interviewSession;
+    // If database is not connected, return error
+    if (!isDatabaseConnected) {
+      throw new AppError('Database connection failed. Please try again later.', 500, 'DB_001');
+    }
     
-    if (isDatabaseConnected) {
-      // Use MongoDB
-      candidate = new Candidate({
+    // Check if candidate already has an active session
+    const existingSession = await InterviewSession.findOne({
+      'candidateId.email': email,
+      'candidateId.status': { $in: ['pending', 'in-progress'] },
+      isDeleted: { $ne: true }
+    });
+    
+    if (existingSession) {
+      throw new AppError('Candidate already has an active interview session', 409, 'DB_003');
+    }
+    
+    // Use MongoDB transaction for atomic operations
+    session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      // Create candidate within transaction
+      const candidate = new Candidate({
         name,
         email,
         phone,
         resumeText,
         role,
+        gdprConsent: gdprConsent || false,
         status: 'in-progress'
       });
       
-      await candidate.save();
+      await candidate.save({ session });
       
-      // Generate questions using AI
+      // Generate configurable questions
       let questions = [];
-      if (resumeText) {
-        questions = await generateQuestions(resumeText, role);
+      try {
+        // Use custom questions if provided, otherwise generate questions
+        if (customQuestions && Array.isArray(customQuestions) && customQuestions.length > 0) {
+          // Add custom questions
+          questions = addCustomQuestions([], customQuestions);
+          
+          // Generate additional questions if needed
+          if (questionCount && questions.length < questionCount) {
+            const remainingCount = questionCount - questions.length;
+            const additionalQuestions = await generateConfigurableQuestions(resumeText, role, remainingCount);
+            questions = questions.concat(additionalQuestions);
+          }
+        } else {
+          // Generate questions based on resume and role
+          questions = await generateConfigurableQuestions(resumeText, role, questionCount, customQuestions);
+        }
+      } catch (error) {
+        console.error('Error generating configurable questions, using fallback:', error);
+        questions = fallbackQuestions;
       }
       
-      // If AI failed or no resume, use default questions
+      // If no questions generated, use fallback questions
       if (!questions || questions.length === 0) {
-        questions = [
-          { text: 'Tell me about yourself', difficulty: 'Easy', time: 60 },
-          { text: 'What interests you about this role?', difficulty: 'Medium', time: 90 },
-          { text: 'Where do you see yourself in 5 years?', difficulty: 'Hard', time: 120 }
-        ];
+        questions = fallbackQuestions;
       }
       
-      // Create interview session
-      interviewSession = new InterviewSession({
+      // Create interview session within transaction
+      const interviewSession = new InterviewSession({
         candidateId: candidate._id,
         questions: questions.map(q => ({
           ...q,
@@ -95,79 +119,45 @@ async function startInterview(req, res) {
         currentQuestionIndex: 0
       });
       
-      await interviewSession.save();
+      await interviewSession.save({ session });
+      
+      // Commit transaction
+      await session.commitTransaction();
+      session.endSession();
       
       // Populate candidate data for response
       await interviewSession.populate('candidateId');
-    } else {
-      // Use in-memory storage
-      const candidateId = generateId();
-      candidate = {
-        _id: candidateId,
-        name,
-        email,
-        phone,
-        resumeText,
-        role,
-        status: 'in-progress',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
       
-      inMemoryCandidates.push(candidate);
+      // Log audit event
+      await logAuditEvent('CREATE_CANDIDATE', 'Candidate', candidate._id, {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
       
-      // Generate questions using AI
-      let questions = [];
-      if (resumeText) {
-        try {
-          questions = await generateQuestions(resumeText, role);
-        } catch (error) {
-          console.error('Error generating questions:', error);
-        }
-      }
-      
-      // If AI failed or no resume, use default questions
-      if (!questions || questions.length === 0) {
-        questions = [
-          { text: 'Tell me about yourself', difficulty: 'Easy', time: 60 },
-          { text: 'What interests you about this role?', difficulty: 'Medium', time: 90 },
-          { text: 'Where do you see yourself in 5 years?', difficulty: 'Hard', time: 120 }
-        ];
-      }
-      
-      const sessionId = generateId();
-      interviewSession = {
-        _id: sessionId,
-        candidateId,
-        questions: questions.map(q => ({
-          ...q,
-          answer: '',
-          draft: '',
-          score: 0
-        })),
-        currentQuestionIndex: 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      inMemorySessions.push(interviewSession);
-    }
+      await logAuditEvent('CREATE_INTERVIEW', 'InterviewSession', interviewSession._id, {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
     
-    res.status(201).json({
-      message: 'Interview started successfully',
-      candidate: candidate,
-      session: {
-        id: interviewSession._id,
-        questions: interviewSession.questions,
-        currentQuestionIndex: interviewSession.currentQuestionIndex
+      // Send standardized success response
+      res.status(201).json(formatSuccessResponse({
+        candidate: candidate,
+        session: {
+          id: interviewSession._id,
+          questions: interviewSession.questions,
+          currentQuestionIndex: interviewSession.currentQuestionIndex
+        }
+      }, 'Interview started successfully', 201));
+    } catch (transactionError) {
+      // Abort transaction if any error occurs
+      if (session && session.inTransaction()) {
+        await session.abortTransaction();
+        session.endSession();
       }
-    });
+      throw transactionError;
+    }
   } catch (error) {
-    console.error('Error starting interview:', error);
-    res.status(500).json({ 
-      error: 'Failed to start interview',
-      details: error.message 
-    });
+    next(error);
   }
 }
 
@@ -176,51 +166,45 @@ async function startInterview(req, res) {
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-async function submitAnswer(req, res) {
+async function submitAnswer(req, res, next) {
   try {
-    const { sessionId, answerText } = req.body;
+    const { id } = req.params; // Get session ID from URL parameter
+    const { answerText } = req.body;
     
-    if (!sessionId || answerText === undefined) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: sessionId, answerText' 
-      });
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid interview session ID format', 400, 'VALID_001');
+    }
+    
+    if (answerText === undefined) {
+      throw new AppError('Answer text is required', 400, 'VALID_004');
     }
     
     // Check if database is connected
     const isDatabaseConnected = mongoose.connection.readyState === 1;
     
-    let interviewSession;
+    // If database is not connected, return error
+    if (!isDatabaseConnected) {
+      throw new AppError('Database connection failed. Please try again later.', 500, 'DB_001');
+    }
     
-    if (isDatabaseConnected) {
-      // Use MongoDB
-      interviewSession = await InterviewSession.findById(sessionId);
-      if (!interviewSession) {
-        return res.status(404).json({ error: 'Interview session not found' });
-      }
-      
-      // Check if interview is already completed
-      const candidate = await Candidate.findById(interviewSession.candidateId);
-      if (candidate && candidate.status === 'completed') {
-        return res.status(400).json({ error: 'Interview already completed' });
-      }
-    } else {
-      // Use in-memory storage
-      interviewSession = inMemorySessions.find(s => s._id === sessionId);
-      if (!interviewSession) {
-        return res.status(404).json({ error: 'Interview session not found' });
-      }
-      
-      const candidate = inMemoryCandidates.find(c => c._id === interviewSession.candidateId);
-      if (candidate && candidate.status === 'completed') {
-        return res.status(400).json({ error: 'Interview already completed' });
-      }
+    // Use MongoDB (excluding soft-deleted)
+    const interviewSession = await InterviewSession.findOne({ _id: id, isDeleted: { $ne: true } });
+    if (!interviewSession) {
+      throw new AppError('Interview session not found', 404, 'INT_001');
+    }
+    
+    // Check if interview is already completed
+    const candidate = await Candidate.findById(interviewSession.candidateId);
+    if (candidate && candidate.status === 'completed') {
+      throw new AppError('Interview already completed', 400, 'INT_002');
     }
     
     const currentIndex = interviewSession.currentQuestionIndex;
     const currentQuestion = interviewSession.questions[currentIndex];
     
     if (!currentQuestion) {
-      return res.status(400).json({ error: 'Invalid question index' });
+      throw new AppError('Invalid question index', 400, 'INT_003');
     }
     
     // Save the answer
@@ -230,10 +214,17 @@ async function submitAnswer(req, res) {
     if (answerText.trim()) {
       try {
         const grading = await gradeAnswer(currentQuestion.text, answerText);
-        currentQuestion.score = grading.score;
+        let baseScore = grading.score;
+              
+        // Apply partial credit if enabled
+        baseScore = applyPartialCredit(baseScore, answerText, currentQuestion.text);
+              
+        // Store base score
+        currentQuestion.score = baseScore;
       } catch (gradingError) {
-        console.error('Error grading answer:', gradingError);
-        // Continue with default score of 0 if grading fails
+        console.error('Error grading answer with AI, using fallback:', gradingError);
+        // Use fallback grading
+        currentQuestion.score = fallbackGrade.score;
       }
     }
     
@@ -242,83 +233,79 @@ async function submitAnswer(req, res) {
       // Move to next question
       interviewSession.currentQuestionIndex += 1;
       
-      // Save session (if using MongoDB)
-      if (isDatabaseConnected) {
-        await interviewSession.save();
-      }
+      // Save session
+      await interviewSession.save();
+      
+      // Log audit event
+      await logAuditEvent('SUBMIT_ANSWER', 'InterviewSession', interviewSession._id, {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        changes: {
+          questionIndex: currentIndex,
+          answerLength: answerText.length
+        }
+      });
       
       // Get next question
       const nextQuestion = interviewSession.questions[interviewSession.currentQuestionIndex];
       
-      res.json({
-        message: 'Answer submitted successfully',
+      // Send standardized success response
+      res.json(formatSuccessResponse({
         nextQuestion: {
           index: interviewSession.currentQuestionIndex,
           question: nextQuestion
         }
-      });
+      }, 'Answer submitted successfully'));
     } else {
-      // Complete interview
-      if (isDatabaseConnected) {
-        // Using MongoDB
-        const candidate = await Candidate.findById(interviewSession.candidateId);
+      // Complete interview using MongoDB transaction for atomicity
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      
+      try {
+        // Update candidate status within transaction
+        const candidate = await Candidate.findById(interviewSession.candidateId).session(session);
         if (candidate) {
           candidate.status = 'completed';
-          await candidate.save();
+          await candidate.save({ session });
         }
         
-        // Calculate overall score
-        const totalScore = interviewSession.questions.reduce((sum, q) => sum + q.score, 0);
-        const averageScore = interviewSession.questions.length > 0 ? 
-          Math.round(totalScore / interviewSession.questions.length) : 0;
-        
-        interviewSession.score = averageScore;
-        
-        // Generate summary using AI
-        try {
-          interviewSession.summary = await generateSummary(interviewSession.questions);
-        } catch (summaryError) {
-          console.error('Error generating summary:', summaryError);
-          interviewSession.summary = 'Interview completed';
-        }
-        
-        await interviewSession.save();
-      } else {
-        // Using in-memory storage
-        const candidate = inMemoryCandidates.find(c => c._id === interviewSession.candidateId);
-        if (candidate) {
-          candidate.status = 'completed';
-        }
-        
-        // Calculate overall score
-        const totalScore = interviewSession.questions.reduce((sum, q) => sum + q.score, 0);
-        const averageScore = interviewSession.questions.length > 0 ? 
-          Math.round(totalScore / interviewSession.questions.length) : 0;
-        
-        interviewSession.score = averageScore;
-        
-        // Generate summary using AI
-        try {
-          interviewSession.summary = await generateSummary(interviewSession.questions);
-        } catch (summaryError) {
-          console.error('Error generating summary:', summaryError);
-          interviewSession.summary = 'Interview completed';
-        }
+        // Commit transaction
+        await session.commitTransaction();
+        session.endSession();
+      } catch (transactionError) {
+        // Abort transaction if any error occurs
+        await session.abortTransaction();
+        session.endSession();
+        throw transactionError;
       }
       
-      res.json({
-        message: 'Interview completed',
+      // Calculate overall score with weighted scoring
+      const scoreResult = calculateFinalScore(interviewSession.questions);
+      
+      // Store both base and weighted scores
+      interviewSession.score = scoreResult.averageScore;
+      interviewSession.weightedScore = scoreResult.weightedAverage;
+      interviewSession.scoreBreakdown = scoreResult.breakdown;
+      
+      // Generate summary using AI
+      try {
+        interviewSession.summary = await generateSummary(interviewSession.questions);
+      } catch (summaryError) {
+        console.error('Error generating summary with AI, using fallback:', summaryError);
+        interviewSession.summary = fallbackSummary;
+      }
+      
+      await interviewSession.save();
+      
+      // Send standardized success response
+      res.json(formatSuccessResponse({
         finalScore: interviewSession.score,
         summary: interviewSession.summary,
         questions: interviewSession.questions
-      });
+      }, 'Interview completed'));
     }
   } catch (error) {
-    console.error('Error submitting answer:', error);
-    res.status(500).json({ 
-      error: 'Failed to submit answer',
-      details: error.message 
-    });
+    next(error);
   }
 }
 
@@ -327,60 +314,335 @@ async function submitAnswer(req, res) {
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-async function finalizeInterview(req, res) {
+async function finalizeInterview(req, res, next) {
   try {
     const { sessionId } = req.body;
     
     if (!sessionId) {
-      return res.status(400).json({ error: 'Missing required field: sessionId' });
+      throw new AppError('Missing required field: sessionId', 400, 'VALID_004');
     }
     
     // Check if database is connected
     const isDatabaseConnected = mongoose.connection.readyState === 1;
     
-    let interviewSession;
+    // If database is not connected, return error
+    if (!isDatabaseConnected) {
+      throw new AppError('Database connection failed. Please try again later.', 500, 'DB_001');
+    }
     
-    if (isDatabaseConnected) {
-      // Use MongoDB
-      interviewSession = await InterviewSession.findById(sessionId);
+    // Use MongoDB transaction for atomic operations
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      // Find interview session within transaction (excluding soft-deleted)
+      const interviewSession = await InterviewSession.findOne({ _id: sessionId, isDeleted: { $ne: true } }).session(session);
       if (!interviewSession) {
-        return res.status(404).json({ error: 'Interview session not found' });
+        throw new AppError('Interview session not found', 404, 'INT_001');
       }
       
       // Mark candidate as completed if not already
-      const candidate = await Candidate.findById(interviewSession.candidateId);
+      const candidate = await Candidate.findById(interviewSession.candidateId).session(session);
       if (candidate && candidate.status !== 'completed') {
         candidate.status = 'completed';
-        await candidate.save();
-      }
-    } else {
-      // Use in-memory storage
-      interviewSession = inMemorySessions.find(s => s._id === sessionId);
-      if (!interviewSession) {
-        return res.status(404).json({ error: 'Interview session not found' });
+        await candidate.save({ session });
       }
       
-      const candidate = inMemoryCandidates.find(c => c._id === interviewSession.candidateId);
-      if (candidate && candidate.status !== 'completed') {
-        candidate.status = 'completed';
-      }
+      // Commit transaction
+      await session.commitTransaction();
+      session.endSession();
+      
+      // Log audit event
+      await logAuditEvent('FINALIZE_INTERVIEW', 'InterviewSession', interviewSession._id, {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+      
+      // Send standardized success response
+      res.json(formatSuccessResponse({
+        session: interviewSession
+      }, 'Interview finalized'));
+    } catch (transactionError) {
+      // Abort transaction if any error occurs
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get interview session by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function getInterviewById(req, res, next) {
+  try {
+    const { id } = req.params;
+    
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid interview session ID format', 400, 'VALID_001');
     }
     
-    res.json({
-      message: 'Interview finalized',
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
+    // If database is not connected, return error
+    if (!isDatabaseConnected) {
+      throw new AppError('Database connection failed. Please try again later.', 500, 'DB_001');
+    }
+    
+    // Use MongoDB to find interview session by ID (excluding soft-deleted)
+    const interviewSession = await InterviewSession.findOne({ _id: id, isDeleted: { $ne: true } });
+    if (!interviewSession) {
+      throw new AppError('Interview session not found', 404, 'INT_001');
+    }
+    
+    // Populate candidate data
+    await interviewSession.populate('candidateId');
+    
+    // Send standardized success response
+    res.json(formatSuccessResponse({
       session: interviewSession
-    });
+    }, 'Interview session retrieved successfully'));
   } catch (error) {
-    console.error('Error finalizing interview:', error);
-    res.status(500).json({ 
-      error: 'Failed to finalize interview',
-      details: error.message 
+    next(error);
+  }
+}
+
+/**
+ * Delete interview session by ID (soft delete)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function deleteInterviewById(req, res, next) {
+  try {
+    const { id } = req.params;
+    
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid interview session ID format', 400, 'VALID_001');
+    }
+    
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
+    // If database is not connected, return error
+    if (!isDatabaseConnected) {
+      throw new AppError('Database connection failed. Please try again later.', 500, 'DB_001');
+    }
+    
+    // Use MongoDB transaction for atomic operations
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      // Find interview session within transaction (excluding soft-deleted)
+      const interviewSession = await InterviewSession.findOne({ _id: id, isDeleted: { $ne: true } }).session(session);
+      if (!interviewSession) {
+        throw new AppError('Interview session not found', 404, 'INT_001');
+      }
+      
+      // Soft delete the interview session
+      interviewSession.isDeleted = true;
+      interviewSession.deletedAt = new Date();
+      await interviewSession.save({ session });
+      
+      // Also soft delete the associated candidate
+      const candidate = await Candidate.findById(interviewSession.candidateId).session(session);
+      if (candidate) {
+        candidate.isDeleted = true;
+        candidate.deletedAt = new Date();
+        await candidate.save({ session });
+      }
+      
+      // Commit transaction
+      await session.commitTransaction();
+      session.endSession();
+      
+      // Log audit event
+      await logAuditEvent('DELETE_INTERVIEW', 'InterviewSession', interviewSession._id, {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+      
+      // Send standardized success response
+      res.json(formatSuccessResponse(null, 'Interview session deleted successfully'));
+    } catch (transactionError) {
+      // Abort transaction if any error occurs
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Finalize interview session by ID (PATCH /interview/:id/finalize)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function patchInterviewById(req, res, next) {
+  try {
+    const { id } = req.params;
+    
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid interview session ID format', 400, 'VALID_001');
+    }
+    
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
+    // If database is not connected, return error
+    if (!isDatabaseConnected) {
+      throw new AppError('Database connection failed. Please try again later.', 500, 'DB_001');
+    }
+    
+    // Use MongoDB transaction for atomic operations
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      // Find interview session within transaction (excluding soft-deleted)
+      const interviewSession = await InterviewSession.findOne({ _id: id, isDeleted: { $ne: true } }).session(session);
+      if (!interviewSession) {
+        throw new AppError('Interview session not found', 404, 'INT_001');
+      }
+      
+      // Mark candidate as completed if not already
+      const candidate = await Candidate.findById(interviewSession.candidateId).session(session);
+      if (candidate && candidate.status !== 'completed') {
+        candidate.status = 'completed';
+        await candidate.save({ session });
+      }
+      
+      // Commit transaction
+      await session.commitTransaction();
+      session.endSession();
+      
+      // Send standardized success response
+      res.json(formatSuccessResponse({
+        session: interviewSession
+      }, 'Interview finalized successfully'));
+    } catch (transactionError) {
+      // Abort transaction if any error occurs
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Adjust a question score manually
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function adjustQuestionScore(req, res, next) {
+  try {
+    const { id } = req.params; // Get session ID from URL parameter
+    const { questionId, newScore, reason } = req.body;
+    
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid interview session ID format', 400, 'VALID_001');
+    }
+    
+    // Check if database is connected
+    const isDatabaseConnected = mongoose.connection.readyState === 1;
+    
+    // If database is not connected, return error
+    if (!isDatabaseConnected) {
+      throw new AppError('Database connection failed. Please try again later.', 500, 'DB_001');
+    }
+    
+    // Use MongoDB (excluding soft-deleted)
+    const interviewSession = await InterviewSession.findOne({ _id: id, isDeleted: { $ne: true } });
+    if (!interviewSession) {
+      throw new AppError('Interview session not found', 404, 'INT_001');
+    }
+    
+    // Find the question by ID
+    const questionIndex = interviewSession.questions.findIndex(q => q._id.toString() === questionId);
+    if (questionIndex === -1) {
+      throw new AppError('Question not found', 404, 'INT_004');
+    }
+    
+    const currentQuestion = interviewSession.questions[questionIndex];
+    const currentScore = currentQuestion.score;
+    
+    // Adjust the score manually
+    const adjustedScore = adjustScoreManually(currentScore, newScore, reason, {
+      id: req.user ? req.user.id : 'system',
+      name: req.user ? req.user.name : 'System'
     });
+    
+    // Update the question score
+    currentQuestion.score = adjustedScore.adjustedScore;
+    
+    // Add adjustment metadata to the question
+    if (!currentQuestion.adjustments) {
+      currentQuestion.adjustments = [];
+    }
+    
+    currentQuestion.adjustments.push({
+      originalScore: adjustedScore.originalScore,
+      adjustedScore: adjustedScore.adjustedScore,
+      reason: adjustedScore.reason,
+      adjustedBy: adjustedScore.adjustedBy,
+      adjustedAt: adjustedScore.adjustedAt,
+      isManualAdjustment: adjustedScore.isManualAdjustment
+    });
+    
+    // Recalculate overall score
+    const scoreResult = calculateFinalScore(interviewSession.questions);
+    interviewSession.score = scoreResult.averageScore;
+    interviewSession.weightedScore = scoreResult.weightedAverage;
+    interviewSession.scoreBreakdown = scoreResult.breakdown;
+    
+    // Save the updated session
+    await interviewSession.save();
+    
+    // Log audit event
+    await logAuditEvent('ADJUST_SCORE', 'InterviewSession', interviewSession._id, {
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      changes: {
+        questionId,
+        originalScore: currentScore,
+        newScore: adjustedScore.adjustedScore,
+        reason
+      }
+    });
+    
+    // Send standardized success response
+    res.json(formatSuccessResponse({
+      question: currentQuestion,
+      sessionScore: interviewSession.score,
+      sessionWeightedScore: interviewSession.weightedScore
+    }, 'Question score adjusted successfully'));
+  } catch (error) {
+    next(error);
   }
 }
 
 module.exports = {
   startInterview,
   submitAnswer,
-  finalizeInterview
+  finalizeInterview,
+  getInterviewById,
+  deleteInterviewById,
+  patchInterviewById,
+  adjustQuestionScore
 };
+
+
+
