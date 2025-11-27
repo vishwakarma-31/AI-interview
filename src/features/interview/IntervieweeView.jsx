@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Form, Button, Spin, Modal, message, Steps, Result, Card } from 'antd';
-import { RedoOutlined, VideoCameraOutlined, FileOutlined } from '@ant-design/icons';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Form, Button, Spin, message, Result, Card } from 'antd';
+import { RedoOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { useInterview } from '../../contexts/InterviewContext';
 import IntervieweeErrorBoundary from '../../components/IntervieweeErrorBoundary';
 import InterviewSetupForm from './components/InterviewSetupForm';
@@ -8,8 +8,7 @@ import InterviewQuestionView from './components/InterviewQuestionView';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { useInterviewTimer } from '../../hooks/useInterviewTimer';
 import { useDraftSaving } from '../../hooks/useDraftSaving';
-import { useToast } from '../../components/ToastContainer.jsx';
-import SkeletonLoader from '../../components/SkeletonLoader.jsx';
+import { useToast } from '../../components/ToastContainer';
 
 export default function IntervieweeView() {
   return (
@@ -38,16 +37,8 @@ function IntervieweeViewContent() {
   const [form] = Form.useForm();
   const [resumeFile] = useState(null);
   const [transcript, setTranscript] = useState('');
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [extendedTime, setExtendedTime] = useState(0);
-  const [showReview, setShowReview] = useState(false); // New state for review step
-  const [reviewAnswer, setReviewAnswer] = useState(''); // New state for review answer
   const [showPreview, setShowPreview] = useState(false); // New state for preview mode
   const [previewData, setPreviewData] = useState(null); // New state for preview data
-  
-  // Refs for focus management
-  const mainContainerRef = useRef(null);
 
   // Handle API errors
   useEffect(() => {
@@ -131,8 +122,6 @@ function IntervieweeViewContent() {
       });
 
       setTranscript('');
-      setShowReview(false); // Hide review step after submission
-      setReviewAnswer(''); // Clear review answer
       addToast('Answer submitted successfully', 'success');
     },
     [activeSession, submitAnswer, transcript, addToast]
@@ -200,6 +189,7 @@ function IntervieweeViewContent() {
       });
       addToast('Interview started successfully', 'success');
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Failed to start interview:', err);
       addToast('Failed to start interview. Please try again.', 'error');
     }
@@ -249,19 +239,19 @@ function IntervieweeViewContent() {
           <Card className="preview-card">
             <div className="interview-info">
               <div className="info-item">
-                <label>Name</label>
+                <span className="label">Name</span>
                 <span>{previewData.name}</span>
               </div>
               <div className="info-item">
-                <label>Email</label>
+                <span className="label">Email</span>
                 <span>{previewData.email}</span>
               </div>
               <div className="info-item">
-                <label>Phone</label>
+                <span className="label">Phone</span>
                 <span>{previewData.phone}</span>
               </div>
               <div className="info-item">
-                <label>Role</label>
+                <span className="label">Role</span>
                 <span>{previewData.role}</span>
               </div>
             </div>
@@ -272,7 +262,7 @@ function IntervieweeViewContent() {
             title="Interview Questions"
           >
             {previewData.questions.map((question, index) => (
-              <div key={index} className="question-preview-item">
+              <div key={`question-${question.text}-${index}`} className="question-preview-item">
                 <div className="question-number">Question {index + 1}</div>
                 <div className="question-text">{question.text}</div>
                 <div className="question-meta">
@@ -343,10 +333,6 @@ function IntervieweeViewContent() {
         pauseTimer={pauseTimer}
         resumeTimer={resumeTimer}
         handleSubmitAnswer={handleSubmitAnswer}
-        showReview={showReview}
-        setShowReview={setShowReview}
-        reviewAnswer={reviewAnswer}
-        setReviewAnswer={setReviewAnswer}
         debouncedSaveDraft={debouncedSaveDraft}
       />
     );
@@ -392,7 +378,7 @@ function IntervieweeViewContent() {
           onStart={onStart}
           showPreview={showPreview}
           setShowPreview={setShowPreview}
-          loading={loadingStates.startInterview}
+          loadingStates={loadingStates}
         />
       </div>
     </div>

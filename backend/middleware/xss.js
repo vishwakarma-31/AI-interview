@@ -1,5 +1,4 @@
 const xss = require('xss');
-const mongoSanitize = require('express-mongo-sanitize');
 const validator = require('validator');
 const { AppError } = require('./errorHandler');
 const logger = require('../services/logger');
@@ -28,6 +27,45 @@ const xssOptions = {
 // Create a custom XSS filter instance with our security configuration
 const customXss = new xss.FilterXSS(xssOptions);
 
+// Helper function to recursively sanitize objects
+// This function handles nested objects and arrays by recursively sanitizing all string values
+// It also sanitizes object keys to prevent key-based injection attacks
+const sanitizeObject = (obj) => {
+  // Handle primitive values and null
+  if (typeof obj !== 'object' || obj === null) {
+    // Sanitize string values to remove potentially dangerous HTML/JavaScript
+    if (typeof obj === 'string') {
+      return customXss.process(obj);
+    }
+    return obj;
+  }
+  
+  // Initialize sanitized object with correct type (array or object)
+  const sanitized = Array.isArray(obj) ? [] : {};
+  
+  // Iterate through all properties of the object
+  const keys = Object.keys(obj);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    // Sanitize the key itself to prevent key-based injection
+    const sanitizedKey = customXss.process(key);
+    
+    // Recursively sanitize based on the type of the value
+    if (typeof obj[key] === 'string') {
+      // Directly sanitize string values
+      sanitized[sanitizedKey] = customXss.process(obj[key]);
+    } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+      // Recursively sanitize nested objects/arrays
+      sanitized[sanitizedKey] = sanitizeObject(obj[key]);
+    } else {
+      // Leave non-string, non-object values unchanged
+      sanitized[sanitizedKey] = obj[key];
+    }
+  }
+  
+  return sanitized;
+};
+
 // Comprehensive input sanitization middleware
 // This middleware sanitizes all user input to prevent XSS attacks
 // It processes request body, query parameters, route parameters, and sensitive headers
@@ -52,7 +90,8 @@ const sanitizeInput = (req, res, next) => {
     if (req.headers && typeof req.headers === 'object') {
       // Focus on headers that are most likely to contain user-generated content
       const sensitiveHeaders = ['user-agent', 'referer', 'x-forwarded-for'];
-      for (const header of sensitiveHeaders) {
+      for (let i = 0; i < sensitiveHeaders.length; i++) {
+        const header = sensitiveHeaders[i];
         if (req.headers[header] && typeof req.headers[header] === 'string') {
           req.headers[header] = customXss.process(req.headers[header]);
         }
@@ -66,43 +105,6 @@ const sanitizeInput = (req, res, next) => {
   }
 };
 
-// Helper function to recursively sanitize objects
-// This function handles nested objects and arrays by recursively sanitizing all string values
-// It also sanitizes object keys to prevent key-based injection attacks
-const sanitizeObject = (obj) => {
-  // Handle primitive values and null
-  if (typeof obj !== 'object' || obj === null) {
-    // Sanitize string values to remove potentially dangerous HTML/JavaScript
-    if (typeof obj === 'string') {
-      return customXss.process(obj);
-    }
-    return obj;
-  }
-  
-  // Initialize sanitized object with correct type (array or object)
-  const sanitized = Array.isArray(obj) ? [] : {};
-  
-  // Iterate through all properties of the object
-  for (const key in obj) {
-    // Sanitize the key itself to prevent key-based injection
-    const sanitizedKey = customXss.process(key);
-    
-    // Recursively sanitize based on the type of the value
-    if (typeof obj[key] === 'string') {
-      // Directly sanitize string values
-      sanitized[sanitizedKey] = customXss.process(obj[key]);
-    } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-      // Recursively sanitize nested objects/arrays
-      sanitized[sanitizedKey] = sanitizeObject(obj[key]);
-    } else {
-      // Leave non-string, non-object values unchanged
-      sanitized[sanitizedKey] = obj[key];
-    }
-  }
-  
-  return sanitized;
-};
-
 // Enhanced validation middleware
 // This middleware performs semantic validation on user input
 // It checks email formats, URLs, and phone numbers using the validator library
@@ -110,7 +112,9 @@ const validateInput = (req, res, next) => {
   try {
     // Validate email addresses, URLs, and phone numbers in the request body
     if (req.body && typeof req.body === 'object') {
-      for (const key in req.body) {
+      const keys = Object.keys(req.body);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
         // Check if the field name suggests it should contain an email
         if (key.includes('email') && typeof req.body[key] === 'string') {
           if (!validator.isEmail(req.body[key])) {
@@ -158,19 +162,23 @@ const preventSqlInjection = (req, res, next) => {
     const inputSources = [
       req.body,    // Request body data
       req.query,   // Query parameters
-      req.params,  // Route parameters
-      req.headers  // HTTP headers
+      req.params   // Route parameters
+      // req.headers  // HTTP headers (commented out to avoid false positives)
     ];
     
     // Iterate through each input source
-    for (const source of inputSources) {
+    for (let i = 0; i < inputSources.length; i++) {
+      const source = inputSources[i];
       if (source && typeof source === 'object') {
-        for (const key in source) {
+        const keys = Object.keys(source);
+        for (let j = 0; j < keys.length; j++) {
+          const key = keys[j];
           const value = source[key];
           // Only check string values for SQL injection patterns
           if (typeof value === 'string') {
             // Check each pattern against the input value
-            for (const pattern of sqlInjectionPatterns) {
+            for (let k = 0; k < sqlInjectionPatterns.length; k++) {
+              const pattern = sqlInjectionPatterns[k];
               if (pattern.test(value)) {
                 // Log potential SQL injection attempt for security monitoring
                 logger.warn('Potential SQL injection attempt detected', {
@@ -219,9 +227,12 @@ const validateInputLength = (req, res, next) => {
     const inputSources = [req.body, req.query, req.params];
     
     // Iterate through each input source
-    for (const source of inputSources) {
+    for (let i = 0; i < inputSources.length; i++) {
+      const source = inputSources[i];
       if (source && typeof source === 'object') {
-        for (const key in source) {
+        const keys = Object.keys(source);
+        for (let j = 0; j < keys.length; j++) {
+          const key = keys[j];
           const value = source[key];
           // Only validate string values for length
           if (typeof value === 'string') {

@@ -5,8 +5,7 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const RedisStore = require('connect-redis');
+const { RedisStore } = require('connect-redis');
 const redis = require('redis');
 const mongoSanitize = require('express-mongo-sanitize');
 const compression = require('compression');
@@ -105,7 +104,6 @@ const { validateRequest } = require('./middleware/requestValidation');
 const { sanitizeInput, validateInput, preventSqlInjection, validateInputLength } = require('./middleware/xss');
 const { handleAppError, handleNotFound, handleGlobalError, formatSuccessResponse, formatErrorResponse } = require('./middleware/errorHandler');
 const { initializeSessionSecurity } = require('./middleware/sessionValidation');
-const { handleFileUploadError, validateFileContent } = require('./middleware/fileUpload');
 const i18nMiddleware = require('./middleware/i18n');
 const organizationBrandingMiddleware = require('./middleware/organizationBranding');
 
@@ -166,7 +164,7 @@ redisClient.on('error', (err) => {
   logger.error('Redis error:', err);
 });
 
-redisClient.connect().catch(console.error);
+redisClient.connect().catch(logger.error);
 
 // Session configuration with Redis store
 app.use(session({
@@ -277,17 +275,39 @@ app.use(i18nMiddleware); // Add i18n middleware
 app.use(organizationBrandingMiddleware); // Add organization branding middleware
 app.use(validateRequest);
 // Enhanced MongoDB sanitization
-app.use(mongoSanitize({
-  allowDots: false, // Prevent dots in keys which can be used for NoSQL injection
-  replaceWith: '_'  // Replace dangerous characters with underscores
-}));
+app.use((req, res, next) => {
+  // Create a copy of the request object to avoid modifying the original
+  const reqCopy = {
+    body: req.body ? { ...req.body } : {},
+    params: req.params ? { ...req.params } : {},
+    headers: req.headers ? { ...req.headers } : {},
+    query: req.query ? { ...req.query } : {}
+  };
+  
+  // Apply mongoSanitize to the copied request object
+  mongoSanitize({
+    allowDots: false, // Prevent dots in keys which can be used for NoSQL injection
+    replaceWith: '_'  // Replace dangerous characters with underscores
+  })(reqCopy, res, () => {
+    // Update the original request object with sanitized values
+    if (req.body) req.body = reqCopy.body;
+    if (req.params) req.params = reqCopy.params;
+    if (req.headers) req.headers = reqCopy.headers;
+    if (req.query) req.query = reqCopy.query;
+    
+    // Continue to the next middleware
+    next();
+  });
+});
 
 // Additional NoSQL injection protection
 app.use((req, res, next) => {
   // Check for common NoSQL injection patterns in request body
   if (req.body && typeof req.body === 'object') {
-    const dangerousPatterns = ['\$where', '\$exists', '\$regex', '\$elemMatch'];
-    for (const key in req.body) {
+    const dangerousPatterns = ['\\$where', '\\$exists', '\\$regex', '\\$elemMatch'];
+    const bodyKeys = Object.keys(req.body);
+    for (let i = 0; i < bodyKeys.length; i++) {
+      const key = bodyKeys[i];
       if (dangerousPatterns.some(pattern => key.includes(pattern))) {
         logger.warn('Potential NoSQL injection attempt detected', {
           pattern: dangerousPatterns.find(p => key.includes(p)),
@@ -297,14 +317,14 @@ app.use((req, res, next) => {
         });
         
         // Create standardized error response
-        const errorResponse = formatErrorResponse(
-          new Error('Invalid input detected'), 
-          req
-        );
-        return res.status(400).json(errorResponse);
+        return res.status(400).json({
+          error: 'Invalid input detected',
+          message: 'Request contains invalid characters'
+        });
       }
     }
   }
+  
   next();
 });
 
@@ -315,7 +335,7 @@ app.use(validateInput); // Input validation
 app.use(validateInputLength); // Length validation
 
 // File upload error handling middleware
-app.use(handleFileUploadError);
+// app.use(handleFileUploadError); // This is an error handler, not a regular middleware
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -447,7 +467,7 @@ mongoose.connect(process.env.MONGO_URI, config.mongo.options)
       logger.info(`Health check endpoint: http://localhost:${PORT}/health`);
       logger.info(`Readiness check endpoint: http://localhost:${PORT}/ready`);
     });
-    
+
     // Start HTTPS server if SSL certificates are provided
     if (process.env.SSL_KEY && process.env.SSL_CERT) {
       const fs = require('fs');

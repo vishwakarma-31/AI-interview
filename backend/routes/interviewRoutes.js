@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { startInterview, submitAnswer, finalizeInterview, getInterviewById, deleteInterviewById, patchInterviewById, adjustQuestionScore } = require('../controllers/interviewController');
-const upload = require('../middleware/fileUpload');
+const { startInterview, submitAnswer, getInterviewById, deleteInterviewById, patchInterviewById, adjustQuestionScore } = require('../controllers/interviewController');
+const { upload } = require('../middleware/fileUpload');
 const { validate, validateFile } = require('../middleware/validation');
-const { startInterviewSchema, submitAnswerSchema, finalizeInterviewSchema, adjustScoreSchema } = require('../validation/interviewValidation');
+const { startInterviewSchema, submitAnswerSchema, adjustScoreSchema } = require('../validation/interviewValidation');
 
 /**
  * POST /api/v1/interview/start

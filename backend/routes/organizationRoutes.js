@@ -9,7 +9,8 @@ const {
   getOrganizationStats,
   getOrganizationBranding
 } = require('../controllers/organizationController');
-const { authenticateToken, requirePermission } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
+const { requirePermission } = require('../middleware/rbac');
 
 // Create a new organization (admin only)
 router.post('/', 

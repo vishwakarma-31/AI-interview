@@ -126,7 +126,7 @@ const validateUpdateApiKey = validate(updateApiKeySchema);
 const validateRevokeApiKey = validate(revokeApiKeySchema);
 
 // Validation middleware for question time
-const validateQuestionTime = validate(questionTimeSchema);
+const validateQuestionTimeMiddleware = validate(questionTimeSchema);
 
 module.exports = {
   validate,
@@ -134,7 +134,7 @@ module.exports = {
   validateEmailFormat,
   validatePhoneFormat,
   validateQuestionTimeRange,
-  validateQuestionTime,
+  validateQuestionTime: validateQuestionTimeMiddleware,
   validateRegistration,
   validateLogin,
   validateCreateApiKey,
