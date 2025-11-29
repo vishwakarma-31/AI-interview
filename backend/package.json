@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon server.js",
-    "build": "tsc",
+    "build": "tsc && cp server.js dist/",
     "start:prod": "npm run build && node dist/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -30,7 +30,7 @@
     "@sentry/node": "^10.26.0",
     "@sentry/tracing": "^7.120.4",
     "axios": "^1.13.2",
-    "bcryptjs": "^3.0.3",
+    "bcrypt": "^5.1.1",
     "bullmq": "^5.64.1",
     "compression": "^1.8.1",
     "connect-mongo": "^5.1.0",
