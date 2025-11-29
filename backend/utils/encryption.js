@@ -7,19 +7,22 @@ dotenv.config();
 const algorithm = 'aes-256-cbc';
 const secretKey = process.env.ENCRYPTION_KEY || 'your-encryption-key-change-in-production';
 const key = crypto.scryptSync(secretKey, 'GfG', 32);
-const iv = Buffer.alloc(16, 0); // Initialization vector
 
 /**
- * Encrypt a string
+ * Encrypt a string with a random IV
  * @param {string} text - Text to encrypt
- * @returns {string} Encrypted text in hex format
+ * @returns {string} Encrypted text with IV prepended (format: ivHex:encryptedHex)
  */
 function encrypt(text) {
   try {
+    // Generate a random 16-byte IV
+    const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(algorithm, key, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+    // Prepend the IV (as hex) to the encrypted text
+    const ivHex = iv.toString('hex');
+    return `${ivHex}:${encrypted}`;
   } catch (error) {
     console.error('Encryption error:', error.message);
     return text; // Return original text if encryption fails
@@ -27,14 +30,27 @@ function encrypt(text) {
 }
 
 /**
- * Decrypt a string
- * @param {string} encryptedText - Encrypted text in hex format
+ * Decrypt a string that has an IV prepended
+ * @param {string} encryptedText - Encrypted text with IV prepended (format: ivHex:encryptedHex)
  * @returns {string} Decrypted text
  */
 function decrypt(encryptedText) {
   try {
+    // Extract the IV and encrypted text
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted text format');
+    }
+
+    const ivHex = parts[0];
+    const encryptedHex = parts[1];
+
+    // Convert IV from hex
+    const iv = Buffer.from(ivHex, 'hex');
+
+    // Decrypt the text
     const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (error) {
@@ -49,8 +65,8 @@ function decrypt(encryptedText) {
  * @returns {string} Decrypted value or original if not encrypted
  */
 function decryptEnvVar(envVar) {
-  // If the value looks like it might be encrypted (hex string of appropriate length)
-  if (envVar && typeof envVar === 'string' && /^[0-9a-fA-F]+$/.test(envVar) && envVar.length >= 32) {
+  // If the value looks like it might be encrypted (format: ivHex:encryptedHex)
+  if (envVar && typeof envVar === 'string' && envVar.includes(':')) {
     try {
       // Try to decrypt it
       const decrypted = decrypt(envVar);
@@ -82,5 +98,5 @@ module.exports = {
   encrypt,
   decrypt,
   decryptEnvVar,
-  getDecryptedEnvVar
+  getDecryptedEnvVar,
 };
