@@ -45,51 +45,44 @@ async function initializeSecrets() {
     // Get database credentials
     const dbCredentials = await getDatabaseCredentials();
     const dbUri = dbCredentials.uri || process.env.MONGO_URI || config.mongo.uri;
-    // Only decrypt if it appears to be encrypted
-    process.env.MONGO_URI =
-      /^[0-9a-fA-F]+$/.test(dbUri) && dbUri.length >= 32 ? decryptEnvVar(dbUri) : dbUri;
+    // Only decrypt if it appears to be encrypted (check for our new format with IV prefix)
+    process.env.MONGO_URI = /^[0-9a-fA-F]{32}:/.test(dbUri) ? decryptEnvVar(dbUri) : dbUri;
 
     // Get JWT secrets
     const jwtSecrets = await getJWTSecrets();
     const accessTokenSecret = jwtSecrets.accessTokenSecret || process.env.JWT_SECRET;
     const refreshTokenSecret = jwtSecrets.refreshTokenSecret || process.env.JWT_REFRESH_SECRET;
 
-    // Only decrypt if they appear to be encrypted
-    process.env.JWT_SECRET =
-      /^[0-9a-fA-F]+$/.test(accessTokenSecret) && accessTokenSecret.length >= 32
-        ? decryptEnvVar(accessTokenSecret)
-        : accessTokenSecret;
-    process.env.JWT_REFRESH_SECRET =
-      /^[0-9a-fA-F]+$/.test(refreshTokenSecret) && refreshTokenSecret.length >= 32
-        ? decryptEnvVar(refreshTokenSecret)
-        : refreshTokenSecret;
+    // Only decrypt if they appear to be encrypted (check for our new format with IV prefix)
+    process.env.JWT_SECRET = /^[0-9a-fA-F]{32}:/.test(accessTokenSecret)
+      ? decryptEnvVar(accessTokenSecret)
+      : accessTokenSecret;
+    process.env.JWT_REFRESH_SECRET = /^[0-9a-fA-F]{32}:/.test(refreshTokenSecret)
+      ? decryptEnvVar(refreshTokenSecret)
+      : refreshTokenSecret;
 
     // Get OpenAI API key
     const openaiApiKey = await getOpenAIApiKey();
-    // Only decrypt if it appears to be encrypted
-    process.env.OPENAI_API_KEY =
-      /^[0-9a-fA-F]+$/.test(openaiApiKey) && openaiApiKey.length >= 32
-        ? decryptEnvVar(openaiApiKey)
-        : openaiApiKey;
+    // Only decrypt if it appears to be encrypted (check for our new format with IV prefix)
+    process.env.OPENAI_API_KEY = /^[0-9a-fA-F]{32}:/.test(openaiApiKey)
+      ? decryptEnvVar(openaiApiKey)
+      : openaiApiKey;
 
     // Get other secrets
     const sessionSecret = process.env.SESSION_SECRET || config.session.secret;
     const encryptionKey = process.env.ENCRYPTION_KEY;
     const sentryDsn = process.env.SENTRY_DSN;
 
-    // Only decrypt if they appear to be encrypted
-    process.env.SESSION_SECRET =
-      /^[0-9a-fA-F]+$/.test(sessionSecret) && sessionSecret.length >= 32
-        ? decryptEnvVar(sessionSecret)
-        : sessionSecret;
-    process.env.ENCRYPTION_KEY =
-      /^[0-9a-fA-F]+$/.test(encryptionKey) && encryptionKey.length >= 32
-        ? decryptEnvVar(encryptionKey)
-        : encryptionKey;
-    process.env.SENTRY_DSN =
-      /^[0-9a-fA-F]+$/.test(sentryDsn) && sentryDsn.length >= 32
-        ? decryptEnvVar(sentryDsn)
-        : sentryDsn;
+    // Only decrypt if they appear to be encrypted (check for our new format with IV prefix)
+    process.env.SESSION_SECRET = /^[0-9a-fA-F]{32}:/.test(sessionSecret)
+      ? decryptEnvVar(sessionSecret)
+      : sessionSecret;
+    process.env.ENCRYPTION_KEY = /^[0-9a-fA-F]{32}:/.test(encryptionKey)
+      ? decryptEnvVar(encryptionKey)
+      : encryptionKey;
+    process.env.SENTRY_DSN = /^[0-9a-fA-F]{32}:/.test(sentryDsn)
+      ? decryptEnvVar(sentryDsn)
+      : sentryDsn;
 
     logger.info('Secrets initialized successfully');
   } catch (error) {
@@ -217,16 +210,6 @@ const redisClient = redis.createClient({
 redisClient.on('error', err => {
   logger.error('Redis error:', err);
 });
-
-// Connect to Redis and wait for the connection to be established
-(async () => {
-  try {
-    await redisClient.connect();
-    logger.info('Connected to Redis successfully');
-  } catch (error) {
-    logger.error('Failed to connect to Redis:', error.message);
-  }
-})();
 
 // Session configuration with Redis store
 app.use(
@@ -506,11 +489,23 @@ app.use(handleAppError);
 // Global unhandled error handler (should be last)
 app.use(handleGlobalError);
 
-// Connect to MongoDB with connection pooling
+// Connect to MongoDB with connection pooling and wait for Redis connection
 mongoose
   .connect(process.env.MONGO_URI, config.mongo.options)
-  .then(() => {
+  .then(async () => {
     logger.info('Connected to MongoDB with connection pooling');
+
+    // Wait for Redis connection to be established
+    try {
+      await redisClient.connect();
+      logger.info('Connected to Redis successfully');
+    } catch (error) {
+      logger.error('Failed to connect to Redis:', error.message);
+      logger.info(
+        'Please ensure Redis is running or update the Redis configuration in your .env file'
+      );
+      process.exit(1); // Exit if Redis connection fails
+    }
 
     // Start HTTP server
     app.listen(PORT, () => {

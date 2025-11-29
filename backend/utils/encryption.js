@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const dotenv = require('dotenv');
+const logger = require('../services/logger');
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ function encrypt(text) {
     const ivHex = iv.toString('hex');
     return `${ivHex}:${encrypted}`;
   } catch (error) {
-    console.error('Encryption error:', error.message);
+    logger.error('Encryption error:', error.message);
     return text; // Return original text if encryption fails
   }
 }
@@ -54,7 +55,7 @@ function decrypt(encryptedText) {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (error) {
-    console.error('Decryption error:', error.message);
+    logger.error('Decryption error:', error.message);
     return encryptedText; // Return original text if decryption fails
   }
 }
@@ -66,7 +67,8 @@ function decrypt(encryptedText) {
  */
 function decryptEnvVar(envVar) {
   // If the value looks like it might be encrypted (format: ivHex:encryptedHex)
-  if (envVar && typeof envVar === 'string' && envVar.includes(':')) {
+  // Check if it has the correct format: 32 hex characters for IV, colon, then encrypted data
+  if (envVar && typeof envVar === 'string' && /^[0-9a-fA-F]{32}:/.test(envVar)) {
     try {
       // Try to decrypt it
       const decrypted = decrypt(envVar);
