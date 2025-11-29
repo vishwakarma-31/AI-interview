@@ -27,98 +27,6 @@ dotenv.config();
 // Load environment-specific configuration
 const config = require('./config');
 
-// Enhanced environment variable handling with decryption
-const { decryptEnvVar } = require('./utils/encryption');
-const {
-  getDatabaseCredentials,
-  getJWTSecrets,
-  getOpenAIApiKey,
-} = require('./utils/secretsManager');
-
-// Initialize secrets manager
-// In production, this would connect to AWS Secrets Manager
-// For now, we'll use environment variables as fallback
-
-// Get secrets from secrets manager or fallback to environment variables
-async function initializeSecrets() {
-  try {
-    // Get database credentials
-    const dbCredentials = await getDatabaseCredentials();
-    const dbUri = dbCredentials.uri || process.env.MONGO_URI || config.mongo.uri;
-    // Only decrypt if it appears to be encrypted (check for our new format with IV prefix)
-    process.env.MONGO_URI = /^[0-9a-fA-F]{32}:/.test(dbUri) ? decryptEnvVar(dbUri) : dbUri;
-
-    // Get JWT secrets
-    const jwtSecrets = await getJWTSecrets();
-    const accessTokenSecret = jwtSecrets.accessTokenSecret || process.env.JWT_SECRET;
-    const refreshTokenSecret = jwtSecrets.refreshTokenSecret || process.env.JWT_REFRESH_SECRET;
-
-    // Only decrypt if they appear to be encrypted (check for our new format with IV prefix)
-    process.env.JWT_SECRET = /^[0-9a-fA-F]{32}:/.test(accessTokenSecret)
-      ? decryptEnvVar(accessTokenSecret)
-      : accessTokenSecret;
-    process.env.JWT_REFRESH_SECRET = /^[0-9a-fA-F]{32}:/.test(refreshTokenSecret)
-      ? decryptEnvVar(refreshTokenSecret)
-      : refreshTokenSecret;
-
-    // Get OpenAI API key
-    const openaiApiKey = await getOpenAIApiKey();
-    // Only decrypt if it appears to be encrypted (check for our new format with IV prefix)
-    process.env.OPENAI_API_KEY = /^[0-9a-fA-F]{32}:/.test(openaiApiKey)
-      ? decryptEnvVar(openaiApiKey)
-      : openaiApiKey;
-
-    // Get other secrets
-    const sessionSecret = process.env.SESSION_SECRET || config.session.secret;
-    const encryptionKey = process.env.ENCRYPTION_KEY;
-    const sentryDsn = process.env.SENTRY_DSN;
-
-    // Only decrypt if they appear to be encrypted (check for our new format with IV prefix)
-    process.env.SESSION_SECRET = /^[0-9a-fA-F]{32}:/.test(sessionSecret)
-      ? decryptEnvVar(sessionSecret)
-      : sessionSecret;
-    process.env.ENCRYPTION_KEY = /^[0-9a-fA-F]{32}:/.test(encryptionKey)
-      ? decryptEnvVar(encryptionKey)
-      : encryptionKey;
-    process.env.SENTRY_DSN = /^[0-9a-fA-F]{32}:/.test(sentryDsn)
-      ? decryptEnvVar(sentryDsn)
-      : sentryDsn;
-
-    logger.info('Secrets initialized successfully');
-  } catch (error) {
-    logger.error('Error initializing secrets:', error.message);
-    // Continue with environment variables as fallback
-  }
-}
-
-// Initialize secrets
-initializeSecrets();
-
-// Environment validation
-const { validateEnvironment } = require('./utils/envValidator');
-
-const envValidation = validateEnvironment();
-
-if (!envValidation.isValid) {
-  logger.error('Environment validation failed:', envValidation.errors);
-  logger.info('Please check your .env file and ensure all required variables are set correctly');
-  process.exit(1);
-}
-
-logger.info('Environment validation passed');
-
-// Runtime config validation
-const { validateRuntimeConfig, getCurrentConfig } = require('./utils/runtimeConfigValidator');
-
-const runtimeConfig = getCurrentConfig();
-const runtimeValidation = validateRuntimeConfig(runtimeConfig);
-
-if (!runtimeValidation.isValid) {
-  logger.warn('Runtime configuration validation warnings:', runtimeValidation.errors);
-} else {
-  logger.info('Runtime configuration validation passed');
-}
-
 // Import routes
 const interviewRoutes = require('./routes/interviewRoutes');
 const candidateRoutes = require('./routes/candidateRoutes');
@@ -155,7 +63,7 @@ const organizationBrandingMiddleware = require('./middleware/organizationBrandin
 // Initialize express app
 const app = express();
 const PORT = process.env.PORT || config.port;
-const SSL_PORT = process.env.SSL_PORT || 5443;
+const SSL_PORT = process.env.SSL_PORT || config.sslPort;
 
 // Generate nonce for CSP
 
@@ -478,13 +386,104 @@ app.use(handleAppError);
 // Global unhandled error handler (should be last)
 app.use(handleGlobalError);
 
-// Connect to MongoDB with connection pooling and wait for Redis connection
-mongoose
-  .connect(process.env.MONGO_URI, config.mongo.options)
-  .then(async () => {
-    logger.info('Connected to MongoDB with connection pooling');
+// Import validation modules
+const { validateEnvironment } = require('./utils/envValidator');
+const { validateRuntimeConfig, getCurrentConfig } = require('./utils/runtimeConfigValidator');
 
-    // Wait for Redis connection to be established
+// Enhanced environment variable handling with decryption
+const { decryptEnvVar } = require('./utils/encryption');
+const {
+  getDatabaseCredentials,
+  getJWTSecrets,
+  getOpenAIApiKey,
+} = require('./utils/secretsManager');
+
+// Get secrets from secrets manager or fallback to environment variables
+async function initializeSecrets() {
+  try {
+    // Get database credentials
+    const dbCredentials = await getDatabaseCredentials();
+    const dbUri =
+      dbCredentials.uri || process.env.MONGO_URI || 'mongodb://localhost:27017/ai-interview';
+    // Only decrypt if it appears to be encrypted (check for our new format with IV prefix)
+    process.env.MONGO_URI = /^[0-9a-fA-F]{32}:/.test(dbUri) ? decryptEnvVar(dbUri) : dbUri;
+
+    // Get JWT secrets
+    const jwtSecrets = await getJWTSecrets();
+    const accessTokenSecret = jwtSecrets.accessTokenSecret || process.env.JWT_SECRET;
+    const refreshTokenSecret = jwtSecrets.refreshTokenSecret || process.env.JWT_REFRESH_SECRET;
+
+    // Only decrypt if they appear to be encrypted (check for our new format with IV prefix)
+    process.env.JWT_SECRET = /^[0-9a-fA-F]{32}:/.test(accessTokenSecret)
+      ? decryptEnvVar(accessTokenSecret)
+      : accessTokenSecret;
+    process.env.JWT_REFRESH_SECRET = /^[0-9a-fA-F]{32}:/.test(refreshTokenSecret)
+      ? decryptEnvVar(refreshTokenSecret)
+      : refreshTokenSecret;
+
+    // Get OpenAI API key
+    const openaiApiKey = await getOpenAIApiKey();
+    // Only decrypt if it appears to be encrypted (check for our new format with IV prefix)
+    process.env.OPENAI_API_KEY = /^[0-9a-fA-F]{32}:/.test(openaiApiKey)
+      ? decryptEnvVar(openaiApiKey)
+      : openaiApiKey;
+
+    // Get other secrets
+    const sessionSecret = process.env.SESSION_SECRET || 'dev-session-secret-change-in-production';
+    const encryptionKey = process.env.ENCRYPTION_KEY;
+    const sentryDsn = process.env.SENTRY_DSN;
+
+    // Only decrypt if they appear to be encrypted (check for our new format with IV prefix)
+    process.env.SESSION_SECRET = /^[0-9a-fA-F]{32}:/.test(sessionSecret)
+      ? decryptEnvVar(sessionSecret)
+      : sessionSecret;
+    process.env.ENCRYPTION_KEY = /^[0-9a-fA-F]{32}:/.test(encryptionKey)
+      ? decryptEnvVar(encryptionKey)
+      : encryptionKey;
+    process.env.SENTRY_DSN = /^[0-9a-fA-F]{32}:/.test(sentryDsn)
+      ? decryptEnvVar(sentryDsn)
+      : sentryDsn;
+
+    logger.info('Secrets initialized successfully');
+  } catch (error) {
+    logger.error('Error initializing secrets:', error.message);
+    // Continue with environment variables as fallback
+  }
+}
+
+// Async function to start the server with proper sequencing
+async function startServer() {
+  try {
+    // 1. Initialize secrets first
+    await initializeSecrets();
+
+    // 2. Load configuration after secrets are initialized
+    // Note: config is already loaded at the top of the file
+
+    // 3. Run environment validation
+    const envValidation = validateEnvironment();
+
+    if (!envValidation.isValid) {
+      logger.error('Environment validation failed:', envValidation.errors);
+      logger.info(
+        'Please check your .env file and ensure all required variables are set correctly'
+      );
+      process.exit(1);
+    }
+
+    logger.info('Environment validation passed');
+
+    // Runtime config validation
+    const runtimeConfig = getCurrentConfig();
+    const runtimeValidation = validateRuntimeConfig(runtimeConfig);
+
+    if (!runtimeValidation.isValid) {
+      logger.warn('Runtime configuration validation warnings:', runtimeValidation.errors);
+    } else {
+      logger.info('Runtime configuration validation passed');
+    }
+
+    // 4. Connect to Redis
     try {
       await redisClient.connect();
       logger.info('Connected to Redis successfully');
@@ -496,7 +495,11 @@ mongoose
       process.exit(1); // Exit if Redis connection fails
     }
 
-    // Start HTTP server
+    // 5. Connect to MongoDB
+    await mongoose.connect(process.env.MONGO_URI, config.mongo.options);
+    logger.info('Connected to MongoDB with connection pooling');
+
+    // 6. Start the Express server
     app.listen(PORT, () => {
       logger.info(`HTTP Server is running on port ${PORT}`);
       logger.info(`Health check endpoint: http://localhost:${PORT}/health`);
@@ -517,12 +520,14 @@ mongoose
         logger.info(`Readiness check endpoint: https://localhost:${SSL_PORT}/ready`);
       });
     }
-  })
-  .catch(error => {
-    logger.error('Database connection error:', error.message);
-    logger.info('Please ensure MongoDB is running or update the MONGO_URI in your .env file');
-    process.exit(1); // Exit if database connection fails
-  });
+  } catch (error) {
+    logger.error('Failed to start server:', error.message);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
