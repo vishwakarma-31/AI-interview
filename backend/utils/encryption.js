@@ -7,7 +7,10 @@ dotenv.config();
 // Encryption configuration
 const algorithm = 'aes-256-cbc';
 const secretKey = process.env.ENCRYPTION_KEY || 'your-encryption-key-change-in-production';
-const key = crypto.scryptSync(secretKey, 'GfG', 32);
+// Use environment variable for salt, fallback to a more complex default or random string
+const salt =
+  process.env.ENCRYPTION_SALT || 'complex-default-salt-for-derivation-change-in-production';
+const key = crypto.scryptSync(secretKey, salt, 32);
 
 /**
  * Encrypt a string with a random IV

@@ -10,7 +10,6 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const { RedisStore } = require('connect-redis');
-const redis = require('redis');
 const mongoSanitize = require('express-mongo-sanitize');
 const compression = require('compression');
 const multer = require('multer');
@@ -19,6 +18,7 @@ const cookieParser = require('cookie-parser');
 // Sentry integration
 const Sentry = require('@sentry/node');
 const Tracing = require('@sentry/tracing');
+const redisClient = require('./config/redisClient');
 const logger = require('./services/logger');
 
 // Load environment variables
@@ -199,17 +199,6 @@ const limiter = rateLimit({
 
 // Apply rate limiting to all requests
 app.use(limiter);
-
-// Create Redis client
-const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || config.redis.host,
-  port: process.env.REDIS_PORT || config.redis.port,
-  password: process.env.REDIS_PASSWORD || config.redis.password,
-});
-
-redisClient.on('error', err => {
-  logger.error('Redis error:', err);
-});
 
 // Session configuration with Redis store
 app.use(

@@ -1,28 +1,10 @@
 const crypto = require('crypto');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
-const redis = require('redis');
-
 const User = require('../models/User');
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../services/logger');
-
-// Get Redis configuration from environment or config
-const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
-});
-
-// Handle Redis connection errors
-redisClient.on('error', err => {
-  logger.error('Redis error in authController:', err);
-});
-
-// Connect to Redis
-redisClient.connect().catch(err => {
-  logger.error('Failed to connect to Redis in authController:', err);
-});
+const redisClient = require('../config/redisClient');
 
 dotenv.config();
 
@@ -117,7 +99,7 @@ async function register(req, res, next) {
     res.cookie('refreshToken', userRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -178,7 +160,7 @@ async function login(req, res, next) {
     res.cookie('refreshToken', userRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
