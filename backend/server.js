@@ -3,13 +3,9 @@ const fs = require('fs');
 const https = require('https');
 
 const express = require('express');
-const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const session = require('express-session');
-const { RedisStore } = require('connect-redis');
 const mongoSanitize = require('express-mongo-sanitize');
 const compression = require('compression');
 const multer = require('multer');
@@ -322,7 +318,6 @@ app.use(handleGlobalError);
 
 // Import validation modules
 const { validateEnvironment } = require('./utils/envValidator');
-const { validateRuntimeConfig, getCurrentConfig } = require('./utils/runtimeConfigValidator');
 
 // Enhanced environment variable handling with decryption
 const { decryptEnvVar } = require('./utils/encryption');
@@ -391,124 +386,34 @@ async function startServer() {
     // 1. Initialize secrets first
     await initializeSecrets();
 
-    // 2. Load configuration after secrets are initialized
+    // 2. Load config now that env vars are decrypted
     // eslint-disable-next-line global-require
     const config = require('./config');
 
-    // Define PORT and SSL_PORT after config is loaded
+    // Define PORT after config is loaded
     const PORT = process.env.PORT || config.port;
-    const SSL_PORT = process.env.SSL_PORT || config.sslPort;
 
-    // Set up middleware after config is loaded
-    // Enhanced rate limiting
-    const limiter = rateLimit({
-      windowMs: config.rateLimit.windowMs,
-      max: config.rateLimit.max,
-      message: {
-        error: 'Too many requests from this IP, please try again later.',
-      },
-      standardHeaders: true,
-      legacyHeaders: false,
-      // Skip rate limiting for health check endpoint
-      skip: req => req.path === '/health' || req.path === '/ready',
-    });
-
-    // Apply rate limiting to all requests
-    app.use(limiter);
-
-    // Session configuration with Redis store
-    app.use(
-      session({
-        secret: process.env.SESSION_SECRET || config.session.secret,
-        resave: false,
-        saveUninitialized: false,
-        store: new RedisStore({
-          client: redisClient,
-          ttl: config.session.ttl, // 24 hours
-        }),
-        cookie: {
-          secure: process.env.NODE_ENV === 'production',
-          httpOnly: true,
-          maxAge: 1000 * 60 * 60 * 24, // 24 hours
-        },
-        // Session validation
-        rolling: true, // Reset session cookie on each request
-      })
-    );
-
-    // CORS configuration with enhanced security for production
-    const corsOptions = {
-      origin: (origin, callback) => {
-        // Block requests with no origin unless there's a specific reason to allow them
-        if (!origin) {
-          logger.warn('CORS blocked request with no origin');
-          return callback(new Error('Requests with no origin are not allowed'));
-        }
-
-        // Use environment-specific CORS configuration
-        const allowedOrigins = config.cors.origin;
-
-        // Check if origin is in the allowed list
-        if (allowedOrigins.includes(origin) || allowedOrigins.length === 0) {
-          callback(null, true);
-        } else {
-          logger.warn('CORS blocked request from origin:', origin);
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
-      optionsSuccessStatus: 200,
-      credentials: config.cors.credentials,
-    };
-
-    app.use(cors(corsOptions));
-
-    // 3. Run environment validation
+    // 3. Validate environment
     const envValidation = validateEnvironment();
-
     if (!envValidation.isValid) {
-      logger.error('Environment validation failed:', envValidation.errors);
-      logger.info(
-        'Please check your .env file and ensure all required variables are set correctly'
-      );
-      process.exit(1);
+      throw new Error('Environment validation failed');
     }
 
-    logger.info('Environment validation passed');
-
-    // Runtime config validation
-    const runtimeConfig = getCurrentConfig();
-    const runtimeValidation = validateRuntimeConfig(runtimeConfig);
-
-    if (!runtimeValidation.isValid) {
-      logger.warn('Runtime configuration validation warnings:', runtimeValidation.errors);
-    } else {
-      logger.info('Runtime configuration validation passed');
-    }
-
-    // 4. Connect to Redis
-    try {
-      await redisClient.connect();
-      logger.info('Connected to Redis successfully');
-    } catch (error) {
-      logger.error('Failed to connect to Redis:', error.message);
-      logger.info(
-        'Please ensure Redis is running or update the Redis configuration in your .env file'
-      );
-      process.exit(1); // Exit if Redis connection fails
-    }
+    // 4. Connect to Redis (Shared client)
+    await redisClient.connect();
+    logger.info('Connected to Redis successfully');
 
     // 5. Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI, config.mongo.options);
-    logger.info('Connected to MongoDB with connection pooling');
+    logger.info('Connected to MongoDB');
 
-    // 6. Start the Express server
+    // 6. Start Server
     app.listen(PORT, () => {
-      logger.info(`HTTP Server is running on port ${PORT}`);
-      logger.info(`Health check endpoint: http://localhost:${PORT}/health`);
-      logger.info(`Readiness check endpoint: http://localhost:${PORT}/ready`);
+      logger.info(`HTTP Server running on port ${PORT}`);
     });
 
     // Start HTTPS server if SSL certificates are provided
+    const SSL_PORT = process.env.SSL_PORT || config.sslPort;
     if (process.env.SSL_KEY && process.env.SSL_CERT) {
       const sslOptions = {
         key: fs.readFileSync(process.env.SSL_KEY),
@@ -517,13 +422,11 @@ async function startServer() {
 
       const httpsServer = https.createServer(sslOptions, app);
       httpsServer.listen(SSL_PORT, () => {
-        logger.info(`HTTPS Server is running on port ${SSL_PORT}`);
-        logger.info(`Health check endpoint: https://localhost:${SSL_PORT}/health`);
-        logger.info(`Readiness check endpoint: https://localhost:${SSL_PORT}/ready`);
+        logger.info(`HTTPS Server running on port ${SSL_PORT}`);
       });
     }
   } catch (error) {
-    logger.error('Failed to start server:', error.message);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
