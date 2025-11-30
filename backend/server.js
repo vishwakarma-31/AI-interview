@@ -24,9 +24,6 @@ const logger = require('./services/logger');
 // Load environment variables
 dotenv.config();
 
-// Load environment-specific configuration
-const config = require('./config');
-
 // Import routes
 const interviewRoutes = require('./routes/interviewRoutes');
 const candidateRoutes = require('./routes/candidateRoutes');
@@ -62,8 +59,6 @@ const organizationBrandingMiddleware = require('./middleware/organizationBrandin
 
 // Initialize express app
 const app = express();
-const PORT = process.env.PORT || config.port;
-const SSL_PORT = process.env.SSL_PORT || config.sslPort;
 
 // Generate nonce for CSP
 
@@ -91,66 +86,6 @@ if (process.env.SENTRY_DSN) {
 
 // Log application start
 logger.info('Starting AI Interview Assistant Backend');
-
-// Enhanced rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Skip rate limiting for health check endpoint
-  skip: req => req.path === '/health' || req.path === '/ready',
-});
-
-// Apply rate limiting to all requests
-app.use(limiter);
-
-// Session configuration with Redis store
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || config.session.secret,
-    resave: false,
-    saveUninitialized: false,
-    store: new RedisStore({
-      client: redisClient,
-      ttl: config.session.ttl, // 24 hours
-    }),
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
-    },
-    // Session validation
-    rolling: true, // Reset session cookie on each request
-  })
-);
-
-// CORS configuration with enhanced security for production
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Block requests with no origin unless there's a specific reason to allow them
-    if (!origin) {
-      logger.warn('CORS blocked request with no origin');
-      return callback(new Error('Requests with no origin are not allowed'));
-    }
-
-    // Use environment-specific CORS configuration
-    const allowedOrigins = config.cors.origin;
-
-    // Check if origin is in the allowed list
-    if (allowedOrigins.includes(origin) || allowedOrigins.length === 0) {
-      callback(null, true);
-    } else {
-      logger.warn('CORS blocked request from origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  optionsSuccessStatus: 200,
-  credentials: config.cors.credentials,
-};
 
 // Middleware
 app.use(cookieParser());
@@ -231,7 +166,6 @@ app.post('/api/v1/csp-report', express.json({ type: 'application/csp-report' }),
   res.status(204).end();
 });
 
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(i18nMiddleware); // Add i18n middleware
 app.use(organizationBrandingMiddleware); // Add organization branding middleware
@@ -458,7 +392,75 @@ async function startServer() {
     await initializeSecrets();
 
     // 2. Load configuration after secrets are initialized
-    // Note: config is already loaded at the top of the file
+    // eslint-disable-next-line global-require
+    const config = require('./config');
+
+    // Define PORT and SSL_PORT after config is loaded
+    const PORT = process.env.PORT || config.port;
+    const SSL_PORT = process.env.SSL_PORT || config.sslPort;
+
+    // Set up middleware after config is loaded
+    // Enhanced rate limiting
+    const limiter = rateLimit({
+      windowMs: config.rateLimit.windowMs,
+      max: config.rateLimit.max,
+      message: {
+        error: 'Too many requests from this IP, please try again later.',
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      // Skip rate limiting for health check endpoint
+      skip: req => req.path === '/health' || req.path === '/ready',
+    });
+
+    // Apply rate limiting to all requests
+    app.use(limiter);
+
+    // Session configuration with Redis store
+    app.use(
+      session({
+        secret: process.env.SESSION_SECRET || config.session.secret,
+        resave: false,
+        saveUninitialized: false,
+        store: new RedisStore({
+          client: redisClient,
+          ttl: config.session.ttl, // 24 hours
+        }),
+        cookie: {
+          secure: process.env.NODE_ENV === 'production',
+          httpOnly: true,
+          maxAge: 1000 * 60 * 60 * 24, // 24 hours
+        },
+        // Session validation
+        rolling: true, // Reset session cookie on each request
+      })
+    );
+
+    // CORS configuration with enhanced security for production
+    const corsOptions = {
+      origin: (origin, callback) => {
+        // Block requests with no origin unless there's a specific reason to allow them
+        if (!origin) {
+          logger.warn('CORS blocked request with no origin');
+          return callback(new Error('Requests with no origin are not allowed'));
+        }
+
+        // Use environment-specific CORS configuration
+        const allowedOrigins = config.cors.origin;
+
+        // Check if origin is in the allowed list
+        if (allowedOrigins.includes(origin) || allowedOrigins.length === 0) {
+          callback(null, true);
+        } else {
+          logger.warn('CORS blocked request from origin:', origin);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      optionsSuccessStatus: 200,
+      credentials: config.cors.credentials,
+    };
+
+    app.use(cors(corsOptions));
 
     // 3. Run environment validation
     const envValidation = validateEnvironment();
