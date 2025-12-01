@@ -1,0 +1,9 @@
+node_modules
+.git
+dist
+.storybook
+backend
+.env
+.env.*
+*.log
+README.md
