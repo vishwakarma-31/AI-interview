@@ -1,38 +1,81 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import PropTypes from 'prop-types';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import IntervieweeView from '../../features/interview/IntervieweeView';
 
 // Mock the InterviewContext
 const mockUseInterview = vi.fn();
 vi.mock('../../contexts/InterviewContext', () => ({
-  useInterview: () => mockUseInterview()
+  useInterview: () => mockUseInterview(),
 }));
 
 // Mock Ant Design components
+function MockButton({ children, onClick }) {
+  return (
+    <button type="button" onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+MockButton.propTypes = {
+  children: PropTypes.node,
+  onClick: PropTypes.func,
+};
+
+MockButton.defaultProps = {
+  children: null,
+  onClick: () => {},
+};
+
+function MockForm({ children, onFinish }) {
+  return <form onSubmit={onFinish}>{children}</form>;
+}
+
+MockForm.propTypes = {
+  children: PropTypes.node,
+  onFinish: PropTypes.func,
+};
+
+MockForm.defaultProps = {
+  children: null,
+  onFinish: () => {},
+};
+
+function MockInput({ placeholder, value, onChange }) {
+  return <input placeholder={placeholder} value={value} onChange={onChange} />;
+}
+
+MockInput.propTypes = {
+  placeholder: PropTypes.string,
+  value: PropTypes.string,
+  onChange: PropTypes.func,
+};
+
+MockInput.defaultProps = {
+  placeholder: '',
+  value: '',
+  onChange: () => {},
+};
+
 vi.mock('antd', async () => {
   const actual = await vi.importActual('antd');
   return {
     ...actual,
-    Button: ({ children, onClick, ...props }) => (
-      <button onClick={onClick} {...props}>{children}</button>
-    ),
-    Form: ({ children, onFinish }) => (
-      <form onSubmit={onFinish}>{children}</form>
-    ),
-    Input: ({ placeholder, ...props }) => (
-      <input placeholder={placeholder} {...props} />
-    ),
+    Button: MockButton,
+    Form: MockForm,
+    Input: MockInput,
     message: {
       error: vi.fn(),
       success: vi.fn(),
-      warning: vi.fn()
-    }
+      warning: vi.fn(),
+    },
   };
 });
 
 // Mock react-webcam
 vi.mock('react-webcam', () => ({
-  default: () => <div data-testid="webcam">Webcam Component</div>
+  default: () => <div data-testid="webcam">Webcam Component</div>,
 }));
 
 describe('IntervieweeView - Speech Recognition', () => {
@@ -48,7 +91,7 @@ describe('IntervieweeView - Speech Recognition', () => {
     mockSaveDraft.mockClear();
     mockClearError.mockClear();
     mockClearErrors.mockClear();
-    
+
     // Reset all mocks
     vi.clearAllMocks();
   });
@@ -73,7 +116,7 @@ describe('IntervieweeView - Speech Recognition', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     render(<IntervieweeView />);
@@ -82,17 +125,19 @@ describe('IntervieweeView - Speech Recognition', () => {
     const nameInput = screen.getByPlaceholderText('Enter your full name');
     const emailInput = screen.getByPlaceholderText('Enter your email address');
     const phoneInput = screen.getByPlaceholderText('Enter your phone number');
-    
+
     fireEvent.change(nameInput, { target: { value: 'John Doe' } });
     fireEvent.change(emailInput, { target: { value: 'john@example.com' } });
     fireEvent.change(phoneInput, { target: { value: '+1234567890' } });
-    
+
     const startButton = screen.getByText('Start Interview');
     fireEvent.click(startButton);
 
     // Check that the fallback message is displayed
     expect(screen.getByText('Speech Recognition Not Supported')).toBeInTheDocument();
-    expect(screen.getByText(/Speech Recognition is not supported in this browser/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Speech Recognition is not supported in this browser/)
+    ).toBeInTheDocument();
   });
 
   it('should handle speech recognition errors gracefully', () => {
@@ -111,21 +156,19 @@ describe('IntervieweeView - Speech Recognition', () => {
         }
       }),
       removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn()
+      dispatchEvent: vi.fn(),
     }));
 
     mockUseInterview.mockReturnValue({
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        email: 'john@example.com'
+        email: 'john@example.com',
       },
       activeSession: {
         _id: 'session123',
-        questions: [
-          { text: 'Tell me about yourself', timeLimit: 60 }
-        ],
-        currentQuestionIndex: 0
+        questions: [{ text: 'Tell me about yourself', timeLimit: 60 }],
+        currentQuestionIndex: 0,
       },
       loadingStates: {},
       error: null,
@@ -134,7 +177,7 @@ describe('IntervieweeView - Speech Recognition', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     render(<IntervieweeView />);
@@ -156,14 +199,12 @@ describe('IntervieweeView - Speech Recognition', () => {
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        email: 'john@example.com'
+        email: 'john@example.com',
       },
       activeSession: {
         _id: 'session123',
-        questions: [
-          { text: 'Tell me about yourself', timeLimit: 60 }
-        ],
-        currentQuestionIndex: 0
+        questions: [{ text: 'Tell me about yourself', timeLimit: 60 }],
+        currentQuestionIndex: 0,
       },
       loadingStates: {},
       error: null,
@@ -172,7 +213,7 @@ describe('IntervieweeView - Speech Recognition', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     render(<IntervieweeView />);
@@ -182,7 +223,9 @@ describe('IntervieweeView - Speech Recognition', () => {
     expect(answerInput).toBeInTheDocument();
 
     // Fill in an answer
-    fireEvent.change(answerInput, { target: { value: 'This is my manual answer to the question.' } });
+    fireEvent.change(answerInput, {
+      target: { value: 'This is my manual answer to the question.' },
+    });
     expect(answerInput.value).toBe('This is my manual answer to the question.');
 
     // Submit the answer
@@ -191,7 +234,7 @@ describe('IntervieweeView - Speech Recognition', () => {
 
     // Check that submitAnswer was called
     expect(mockSubmitAnswer).toHaveBeenCalledWith({
-      answerText: 'This is my manual answer to the question.'
+      answerText: 'This is my manual answer to the question.',
     });
   });
 });

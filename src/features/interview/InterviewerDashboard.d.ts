@@ -1,5 +1,8 @@
-import React from 'react';
+/**
+ * @typedef {import('react').ComponentType<any>} InterviewerDashboardType
+ */
 
-const InterviewerDashboard: React.ComponentType<any>;
+/** @type {InterviewerDashboardType} */
+const InterviewerDashboard = /** @type {any} */ {};
 
 export default InterviewerDashboard;

@@ -1,7 +1,7 @@
-import React, { useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { message } from 'antd';
-import { useInterview } from '../contexts/InterviewContext.jsx';
-import { getFriendlyErrorMessage } from '../utils/errorMessages.js';
+import { useInterview } from '../contexts/InterviewContext';
+import { getFriendlyErrorMessage } from '../utils/errorMessages';
 
 /**
  * Global error toast component that displays error messages from the InterviewContext
@@ -17,7 +17,7 @@ export default function GlobalErrorToast() {
       message.error({
         content: friendlyMessage,
         key: 'globalError',
-        duration: 5
+        duration: 5,
       });
       clearError();
     }
@@ -35,27 +35,27 @@ export default function GlobalErrorToast() {
       message.error({
         content: `Interview Start Error: ${friendlyMessage}`,
         key: 'startInterviewError',
-        duration: 0 // Keep until manually closed
+        duration: 0, // Keep until manually closed
       });
     }
-    
+
     // Show submit answer errors
     if (errors.submitAnswer) {
       const friendlyMessage = getFriendlyErrorMessage(errors.submitAnswer);
       message.error({
         content: `Answer Submission Error: ${friendlyMessage}`,
         key: 'submitAnswerError',
-        duration: 0 // Keep until manually closed
+        duration: 0, // Keep until manually closed
       });
     }
-    
+
     // Show fetch candidates errors
     if (errors.fetchCandidates) {
       const friendlyMessage = getFriendlyErrorMessage(errors.fetchCandidates);
       message.error({
         content: `Candidate Load Error: ${friendlyMessage}`,
         key: 'fetchCandidatesError',
-        duration: 0 // Keep until manually closed
+        duration: 0, // Keep until manually closed
       });
     }
   }, [errors]);

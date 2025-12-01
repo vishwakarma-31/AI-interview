@@ -1,9 +1,13 @@
-import React from 'react';
+/**
+ * @typedef {Object} ToastContextType
+ * @property {function(string, ('success'|'error'|'warning'|'info'), number): void} addToast
+ * @property {function(number): void} removeToast
+ */
 
-export interface ToastContextType {
-  addToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', duration?: number) => void;
-  removeToast: (id: number) => void;
-}
+/** @type {import('react').ComponentType<{ children: import('react').ReactNode }>} */
+const ToastProvider = /** @type {any} */ {};
 
-export const ToastProvider: React.ComponentType<{ children: React.ReactNode }>;
-export const useToast: () => ToastContextType;
+/** @returns {ToastContextType} */
+const useToast = () => /** @type {any} */ ({});
+
+export { ToastProvider, useToast };

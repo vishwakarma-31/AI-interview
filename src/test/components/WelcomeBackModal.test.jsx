@@ -5,7 +5,7 @@ import WelcomeBackModal from '../../components/WelcomeBackModal';
 // Mock the InterviewContext
 const mockUseInterview = vi.fn();
 vi.mock('../../contexts/InterviewContext', () => ({
-  useInterview: () => mockUseInterview()
+  useInterview: () => mockUseInterview(),
 }));
 
 describe('WelcomeBackModal', () => {
@@ -22,15 +22,15 @@ describe('WelcomeBackModal', () => {
       activeSession: {
         _id: 'session123',
         currentQuestionIndex: 0,
-        questions: [{ text: 'Question 1' }]
+        questions: [{ text: 'Question 1' }],
       },
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        status: 'in-progress'
+        status: 'in-progress',
       },
       clearActiveSession: mockClearActiveSession,
-      setActiveCandidate: mockSetActiveCandidate
+      setActiveCandidate: mockSetActiveCandidate,
     });
 
     render(<WelcomeBackModal />);
@@ -45,7 +45,7 @@ describe('WelcomeBackModal', () => {
       activeSession: null,
       activeCandidate: null,
       clearActiveSession: mockClearActiveSession,
-      setActiveCandidate: mockSetActiveCandidate
+      setActiveCandidate: mockSetActiveCandidate,
     });
 
     const { container } = render(<WelcomeBackModal />);
@@ -57,15 +57,15 @@ describe('WelcomeBackModal', () => {
       activeSession: {
         _id: 'session123',
         currentQuestionIndex: 0,
-        questions: [{ text: 'Question 1' }]
+        questions: [{ text: 'Question 1' }],
       },
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        status: 'completed'
+        status: 'completed',
       },
       clearActiveSession: mockClearActiveSession,
-      setActiveCandidate: mockSetActiveCandidate
+      setActiveCandidate: mockSetActiveCandidate,
     });
 
     const { container } = render(<WelcomeBackModal />);
@@ -77,15 +77,15 @@ describe('WelcomeBackModal', () => {
       activeSession: {
         _id: 'session123',
         currentQuestionIndex: 0,
-        questions: [{ text: 'Question 1' }]
+        questions: [{ text: 'Question 1' }],
       },
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        status: 'in-progress'
+        status: 'in-progress',
       },
       clearActiveSession: mockClearActiveSession,
-      setActiveCandidate: mockSetActiveCandidate
+      setActiveCandidate: mockSetActiveCandidate,
     });
 
     render(<WelcomeBackModal />);
@@ -103,15 +103,15 @@ describe('WelcomeBackModal', () => {
       activeSession: {
         _id: 'session123',
         currentQuestionIndex: 0,
-        questions: [{ text: 'Question 1' }]
+        questions: [{ text: 'Question 1' }],
       },
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        status: 'in-progress'
+        status: 'in-progress',
       },
       clearActiveSession: mockClearActiveSession,
-      setActiveCandidate: mockSetActiveCandidate
+      setActiveCandidate: mockSetActiveCandidate,
     });
 
     render(<WelcomeBackModal />);

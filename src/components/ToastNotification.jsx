@@ -1,44 +1,60 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-const ToastNotification = ({ message, type = 'info', duration = 5000, onClose }) => {
-  const [isVisible, setIsVisible] = useState(true);
+function ToastNotification({ message, type = 'info', duration = 5000, onClose }) {
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    // Trigger entrance animation after component mounts
+    const entranceTimer = setTimeout(() => {
+      setIsVisible(true);
+    }, 10);
+
     const timer = setTimeout(() => {
       setIsVisible(false);
-      if (onClose) onClose();
+      if (onClose) {
+        const exitTimer = setTimeout(onClose, 300); // Wait for exit animation
+        return () => clearTimeout(exitTimer);
+      }
     }, duration);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(entranceTimer);
+      clearTimeout(timer);
+    };
   }, [duration, onClose]);
 
-  if (!isVisible) return null;
+  if (!isVisible && !onClose) return null;
 
   const getTypeStyles = () => {
     switch (type) {
       case 'success':
         return {
-          backgroundColor: '#f6ffed',
-          border: '1px solid #b7eb8f',
-          color: '#52c41a'
+          backgroundColor: 'rgba(246, 255, 237, 0.85)',
+          border: '1px solid rgba(183, 235, 143, 0.5)',
+          color: '#52c41a',
+          accentColor: '#52c41a',
         };
       case 'error':
         return {
-          backgroundColor: '#fff2f0',
-          border: '1px solid #ffccc7',
-          color: '#ff4d4f'
+          backgroundColor: 'rgba(255, 242, 240, 0.85)',
+          border: '1px solid rgba(255, 204, 199, 0.5)',
+          color: '#ff4d4f',
+          accentColor: '#ff4d4f',
         };
       case 'warning':
         return {
-          backgroundColor: '#fffbe6',
-          border: '1px solid #ffe58f',
-          color: '#faad14'
+          backgroundColor: 'rgba(255, 251, 230, 0.85)',
+          border: '1px solid rgba(255, 229, 143, 0.5)',
+          color: '#faad14',
+          accentColor: '#faad14',
         };
       default:
         return {
-          backgroundColor: '#e6f7ff',
-          border: '1px solid #91d5ff',
-          color: '#1890ff'
+          backgroundColor: 'rgba(230, 247, 255, 0.85)',
+          border: '1px solid rgba(145, 213, 255, 0.5)',
+          color: '#1890ff',
+          accentColor: '#1890ff',
         };
     }
   };
@@ -48,27 +64,39 @@ const ToastNotification = ({ message, type = 'info', duration = 5000, onClose })
       minWidth: '300px',
       maxWidth: '500px',
       padding: '16px',
-      borderRadius: '8px',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      borderRadius: '12px',
       display: 'flex',
-      alignItems: 'flex-start', // Changed to flex-start for better alignment
+      alignItems: 'flex-start',
       ...getTypeStyles(),
       transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
-      transition: 'transform 0.3s ease-in-out, opacity 0.3s ease-in-out',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      transition: 'transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55), opacity 0.3s ease-in-out',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       opacity: isVisible ? 1 : 0,
-      position: 'relative' // Changed from fixed to relative since it's now in a container
+      position: 'relative',
+      backdropFilter: 'blur(10px)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+      overflow: 'hidden',
+    },
+    accentBar: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: '4px',
+      backgroundColor: getTypeStyles().accentColor,
     },
     icon: {
       marginRight: '12px',
       fontSize: '20px',
-      flexShrink: 0 // Prevent icon from shrinking
+      flexShrink: 0,
+      alignSelf: 'center',
     },
     content: {
       flex: 1,
       fontSize: '14px',
       fontWeight: 500,
-      wordBreak: 'break-word' // Handle long words
+      wordBreak: 'break-word',
     },
     close: {
       marginLeft: '12px',
@@ -78,14 +106,15 @@ const ToastNotification = ({ message, type = 'info', duration = 5000, onClose })
       cursor: 'pointer',
       color: 'inherit',
       opacity: 0.7,
-      flexShrink: 0, // Prevent close button from shrinking
+      flexShrink: 0,
       padding: 0,
       width: '20px',
       height: '20px',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
-    }
+      justifyContent: 'center',
+      alignSelf: 'flex-start',
+    },
   };
 
   const getIcon = () => {
@@ -103,13 +132,17 @@ const ToastNotification = ({ message, type = 'info', duration = 5000, onClose })
 
   return (
     <div style={styles.container} role="alert" aria-live="polite">
+      <div style={styles.accentBar} />
       <div style={styles.icon}>{getIcon()}</div>
       <div style={styles.content}>{message}</div>
-      <button 
-        style={styles.close} 
+      <button
+        type="button"
+        style={styles.close}
         onClick={() => {
           setIsVisible(false);
-          if (onClose) onClose();
+          if (onClose) {
+            setTimeout(onClose, 300); // Wait for exit animation
+          }
         }}
         aria-label="Close notification"
       >
@@ -117,6 +150,19 @@ const ToastNotification = ({ message, type = 'info', duration = 5000, onClose })
       </button>
     </div>
   );
+}
+
+ToastNotification.propTypes = {
+  message: PropTypes.string.isRequired,
+  type: PropTypes.oneOf(['success', 'error', 'warning', 'info']),
+  duration: PropTypes.number,
+  onClose: PropTypes.func,
+};
+
+ToastNotification.defaultProps = {
+  type: 'info',
+  duration: 5000,
+  onClose: undefined,
 };
 
 export default ToastNotification;

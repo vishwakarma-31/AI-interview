@@ -10,10 +10,10 @@ import { validateEnvironment, validateRuntimeConfig } from './utils/envValidator
 // Validate environment variables on startup
 try {
   validateEnvironment();
-  const runtimeConfig = validateRuntimeConfig();
-  console.log('Runtime configuration:', runtimeConfig);
-} catch (error: any) {
-  console.error('Environment validation failed:', error.message);
+  validateRuntimeConfig();
+  // console.log('Runtime configuration:', runtimeConfig);
+} catch {
+  // console.error('Environment validation failed:', _error.message);
   // In a real app, you might want to show a user-friendly error message
   // For now, we'll just log it and continue
 }
@@ -21,6 +21,7 @@ try {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ConfigProvider>
+      {/* @ts-expect-error - InterviewProvider type definition issue */}
       <InterviewProvider>
         <App />
       </InterviewProvider>

@@ -1,5 +1,8 @@
-import React from 'react';
+/**
+ * @typedef {import('react').ComponentType<any>} ErrorBoundaryType
+ */
 
-const ErrorBoundary: React.ComponentType<any>;
+/** @type {ErrorBoundaryType} */
+const ErrorBoundary = /** @type {any} */ {};
 
 export default ErrorBoundary;

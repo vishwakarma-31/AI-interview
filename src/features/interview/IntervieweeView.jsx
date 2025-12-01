@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Form, Button, Spin, message, Result, Card } from 'antd';
-import { RedoOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { Form, Button, Spin, message, Result, Typography, Tag } from 'antd';
+import { RedoOutlined } from '@ant-design/icons';
 import { useInterview } from '../../contexts/InterviewContext';
 import IntervieweeErrorBoundary from '../../components/IntervieweeErrorBoundary';
 import InterviewSetupForm from './components/InterviewSetupForm';
@@ -9,6 +9,20 @@ import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { useInterviewTimer } from '../../hooks/useInterviewTimer';
 import { useDraftSaving } from '../../hooks/useDraftSaving';
 import { useToast } from '../../components/ToastContainer';
+
+// Helper function to get tag color based on difficulty
+const getDifficultyColor = difficulty => {
+  switch (difficulty) {
+    case 'Easy':
+      return 'green';
+    case 'Medium':
+      return 'orange';
+    default:
+      return 'red';
+  }
+};
+
+const { Title, Text } = Typography;
 
 export default function IntervieweeView() {
   return (
@@ -168,12 +182,32 @@ function IntervieweeViewContent() {
         phone,
         role,
         questions: [
-          { text: "Explain the concept of React hooks and their advantages.", difficulty: "Medium", timeLimit: 120 },
-          { text: "How would you optimize the performance of a React application?", difficulty: "Hard", timeLimit: 180 },
-          { text: "Describe the difference between state and props in React.", difficulty: "Easy", timeLimit: 90 },
-          { text: "What is the purpose of Redux in a React application?", difficulty: "Medium", timeLimit: 150 },
-          { text: "How do you handle side effects in React components?", difficulty: "Medium", timeLimit: 120 }
-        ]
+          {
+            text: 'Explain the concept of React hooks and their advantages.',
+            difficulty: 'Medium',
+            timeLimit: 120,
+          },
+          {
+            text: 'How would you optimize the performance of a React application?',
+            difficulty: 'Hard',
+            timeLimit: 180,
+          },
+          {
+            text: 'Describe the difference between state and props in React.',
+            difficulty: 'Easy',
+            timeLimit: 90,
+          },
+          {
+            text: 'What is the purpose of Redux in a React application?',
+            difficulty: 'Medium',
+            timeLimit: 150,
+          },
+          {
+            text: 'How do you handle side effects in React components?',
+            difficulty: 'Medium',
+            timeLimit: 120,
+          },
+        ],
       });
       return;
     }
@@ -205,7 +239,7 @@ function IntervieweeViewContent() {
 
   // Handle before unload to warn user about unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
+    const handleBeforeUnload = e => {
       if (activeSession && activeSession.status === 'in-progress') {
         e.preventDefault();
         e.returnValue = '';
@@ -220,7 +254,15 @@ function IntervieweeViewContent() {
   // Render different views based on state
   if (loadingStates.startInterview) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+          width: '100%',
+        }}
+      >
         <Spin size="large" tip="Starting interview..." />
       </div>
     );
@@ -229,63 +271,192 @@ function IntervieweeViewContent() {
   // Show preview if in preview mode
   if (previewData) {
     return (
-      <div className="interview-preview-container">
-        <div className="preview-header">
-          <h2>Interview Preview</h2>
-          <p>Review your interview details before starting</p>
-        </div>
-        
-        <div className="preview-content">
-          <Card className="preview-card">
-            <div className="interview-info">
-              <div className="info-item">
-                <span className="label">Name</span>
-                <span>{previewData.name}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Email</span>
-                <span>{previewData.email}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Phone</span>
-                <span>{previewData.phone}</span>
-              </div>
-              <div className="info-item">
-                <span className="label">Role</span>
-                <span>{previewData.role}</span>
+      <div
+        style={{
+          padding: '24px',
+          maxWidth: '1280px',
+          margin: '0 auto',
+          width: '100%',
+          minHeight: '100vh',
+        }}
+      >
+        <div className="card">
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <Title
+              level={2}
+              style={{
+                marginBottom: '8px',
+                color: 'var(--text-main)',
+                fontWeight: 700,
+              }}
+            >
+              Interview Preview
+            </Title>
+            <Text
+              style={{
+                fontSize: '1rem',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Review your interview details before starting
+            </Text>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: '24px',
+              marginBottom: '30px',
+            }}
+          >
+            <div className="card">
+              <Title
+                level={4}
+                style={{
+                  margin: 0,
+                  marginBottom: '16px',
+                  color: 'var(--text-main)',
+                  fontWeight: 600,
+                }}
+              >
+                Candidate Information
+              </Title>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <Text strong>Name:</Text> {previewData.name}
+                </div>
+                <div>
+                  <Text strong>Email:</Text> {previewData.email}
+                </div>
+                <div>
+                  <Text strong>Phone:</Text> {previewData.phone}
+                </div>
+                <div>
+                  <Text strong>Role:</Text> {previewData.role || 'Not specified'}
+                </div>
               </div>
             </div>
-          </Card>
-          
-          <Card 
-            className="preview-card"
-            title="Interview Questions"
-          >
+
+            <div className="card">
+              <Title
+                level={4}
+                style={{
+                  margin: 0,
+                  marginBottom: '16px',
+                  color: 'var(--text-main)',
+                  fontWeight: 600,
+                }}
+              >
+                Interview Details
+              </Title>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <Text strong>Questions:</Text> {previewData.questions.length}
+                </div>
+                <div>
+                  <Text strong>Estimated Duration:</Text>{' '}
+                  {Math.round(previewData.questions.reduce((sum, q) => sum + q.timeLimit, 0) / 60)}{' '}
+                  minutes
+                </div>
+                <div>
+                  <Text strong>Difficulty Levels:</Text>{' '}
+                  {Array.from(new Set(previewData.questions.map(q => q.difficulty))).join(', ')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <Title
+              level={4}
+              style={{
+                margin: 0,
+                marginBottom: '16px',
+                color: 'var(--text-main)',
+                fontWeight: 600,
+              }}
+            >
+              Interview Questions
+            </Title>
             {previewData.questions.map((question, index) => (
-              <div key={`question-${question.text}-${index}`} className="question-preview-item">
-                <div className="question-number">Question {index + 1}</div>
-                <div className="question-text">{question.text}</div>
-                <div className="question-meta">
-                  <span className={`difficulty ${question.difficulty.toLowerCase()}`}>
+              <div
+                key={question.text}
+                style={{
+                  padding: '16px 0',
+                  borderBottom:
+                    index < previewData.questions.length - 1
+                      ? '1px solid var(--border-light)'
+                      : 'none',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <Text strong>Question {index + 1}</Text>
+                  <Tag
+                    color={getDifficultyColor(question.difficulty)}
+                    style={{
+                      borderRadius: 'var(--radius-full)',
+                      padding: '4px 12px',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                    }}
+                  >
                     {question.difficulty}
-                  </span>
-                  <span className="time-limit">{question.timeLimit}s</span>
+                  </Tag>
+                </div>
+                <Text>{question.text}</Text>
+                <div
+                  style={{
+                    marginTop: '8px',
+                    fontSize: '14px',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  Time limit: {question.timeLimit} seconds
                 </div>
               </div>
             ))}
-          </Card>
-        </div>
-        
-        <div className="preview-actions">
-          <Button onClick={() => setPreviewData(null)}>
-            Back to Form
-          </Button>
-          <Button 
-            type="primary" 
-            onClick={onStart}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '12px',
+              marginTop: '30px',
+            }}
           >
-            Start Interview
-          </Button>
+            <Button
+              size="large"
+              onClick={() => setPreviewData(null)}
+              style={{
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 600,
+                transition: 'all var(--transition-fast)',
+                border: '1px solid var(--border-medium)',
+              }}
+              onMouseEnter={e => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = 'var(--shadow-md)';
+              }}
+              onMouseLeave={e => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'var(--shadow-sm)';
+              }}
+            >
+              Back to Form
+            </Button>
+            <Button type="primary" size="large" onClick={onStart} className="btn-primary">
+              Start Interview
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -294,25 +465,81 @@ function IntervieweeViewContent() {
   // Show completion screen if interview is completed
   if (activeSession && activeSession.status === 'completed') {
     return (
-      <div className="completion-screen">
-        <Result
-          status="success"
-          title="Interview Completed!"
-          subTitle="Thank you for completing the interview. Your responses have been recorded."
-        />
-        <div className="score-display">
-          <div className="score-label">Your Score</div>
-          <div className="score-value">{activeSession.finalScore ?? 'N/A'}</div>
-        </div>
-        {activeSession.summary && (
-          <div className="summary">
-            <h3>Interview Summary</h3>
-            <p>{activeSession.summary}</p>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          padding: '20px',
+          background: 'var(--bg-body)',
+        }}
+      >
+        <div
+          className="card"
+          style={{
+            maxWidth: '600px',
+            width: '100%',
+            textAlign: 'center',
+          }}
+        >
+          <Result
+            status="success"
+            title="Interview Completed!"
+            subTitle="Thank you for completing the interview. Your responses have been recorded."
+          />
+          <div style={{ marginBottom: '24px' }}>
+            <Text
+              strong
+              style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontSize: '18px',
+              }}
+            >
+              Your Score
+            </Text>
+            <Text
+              style={{
+                fontSize: '48px',
+                fontWeight: 700,
+                color: 'var(--primary-color)',
+              }}
+            >
+              {activeSession.finalScore ?? 'N/A'}
+            </Text>
           </div>
-        )}
-        <Button type="primary" size="large" onClick={() => window.location.reload()}>
-          Start New Interview
-        </Button>
+          {activeSession.summary && (
+            <div
+              className="card"
+              style={{
+                textAlign: 'left',
+                marginBottom: '24px',
+              }}
+            >
+              <Title
+                level={4}
+                style={{
+                  margin: 0,
+                  marginBottom: '16px',
+                  color: 'var(--text-main)',
+                  fontWeight: 600,
+                }}
+              >
+                Interview Summary
+              </Title>
+              <Text>{activeSession.summary}</Text>
+            </div>
+          )}
+          <Button
+            type="primary"
+            size="large"
+            onClick={() => window.location.reload()}
+            className="btn-primary"
+          >
+            Start New Interview
+          </Button>
+        </div>
       </div>
     );
   }
@@ -340,47 +567,14 @@ function IntervieweeViewContent() {
 
   // Show setup form by default
   return (
-    <div className="interview-setup-container">
-      <div className="setup-card">
-        <h2>
-          <VideoCameraOutlined style={{ marginRight: 12 }} />
-          AI Interview Assistant
-        </h2>
-        <p style={{ textAlign: 'center', marginBottom: 30, color: 'rgba(255,255,255,0.7)' }}>
-          Prepare for your interview with our AI-powered assistant. 
-          Please fill in your details to get started.
-        </p>
-        
-        {errors.startInterview && (
-          <div style={{ marginBottom: 20 }}>
-            <Result
-              status="error"
-              title="Failed to Start Interview"
-              subTitle={errors.startInterview}
-              extra={[
-                <Button 
-                  type="primary" 
-                  key="retry" 
-                  onClick={onStart}
-                  icon={<RedoOutlined />}
-                >
-                  Retry
-                </Button>
-              ]}
-            />
-          </div>
-        )}
-        
-        <InterviewSetupForm
-          form={form}
-          prefill={prefill}
-          setPrefill={setPrefill}
-          onStart={onStart}
-          showPreview={showPreview}
-          setShowPreview={setShowPreview}
-          loadingStates={loadingStates}
-        />
-      </div>
-    </div>
+    <InterviewSetupForm
+      form={form}
+      prefill={prefill}
+      setPrefill={setPrefill}
+      onStart={onStart}
+      showPreview={showPreview}
+      setShowPreview={setShowPreview}
+      loadingStates={loadingStates}
+    />
   );
 }

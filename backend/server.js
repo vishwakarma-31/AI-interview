@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const fs = require('fs');
 const https = require('https');
 
@@ -10,6 +9,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const compression = require('compression');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
+const crypto = require('crypto');
 
 // Sentry integration
 const Sentry = require('@sentry/node');
@@ -327,6 +327,9 @@ const {
   getOpenAIApiKey,
 } = require('./utils/secretsManager');
 
+// Load config
+const config = require('./config');
+
 // Get secrets from secrets manager or fallback to environment variables
 async function initializeSecrets() {
   try {
@@ -385,10 +388,6 @@ async function startServer() {
   try {
     // 1. Initialize secrets first
     await initializeSecrets();
-
-    // 2. Load config now that env vars are decrypted
-    // eslint-disable-next-line global-require
-    const config = require('./config');
 
     // Define PORT after config is loaded
     const PORT = process.env.PORT || config.port;

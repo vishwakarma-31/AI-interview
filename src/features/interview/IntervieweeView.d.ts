@@ -1,5 +1,8 @@
-import React from 'react';
+/**
+ * @typedef {import('react').ComponentType<any>} IntervieweeViewType
+ */
 
-const IntervieweeView: React.ComponentType<any>;
+/** @type {IntervieweeViewType} */
+const IntervieweeView = /** @type {any} */ {};
 
 export default IntervieweeView;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react';
 import InterviewQuestionView from './InterviewQuestionView';
 
 const meta: Meta<typeof InterviewQuestionView> = {
@@ -35,62 +35,63 @@ const meta: Meta<typeof InterviewQuestionView> = {
 };
 
 export default meta;
+
 type Story = StoryObj<typeof InterviewQuestionView>;
 
 // Mock functions for the story
 const mockToggleRecording = () => {
-  console.log('Toggle recording');
+  // console.log('Toggle recording');
 };
 
-const mockHandleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-  console.log('Text changed:', e.target.value);
+const mockHandleTextChange = (_e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  // console.log('Text changed:', e.target.value);
 };
 
-const mockHandleSubmitAnswer = (text: string) => {
-  console.log('Submit answer:', text);
+const mockHandleSubmitAnswer = (_text: string) => {
+  // console.log('Submit answer:', text);
 };
 
 const mockHandleSkip = () => {
-  console.log('Skip question');
+  // console.log('Skip question');
 };
 
 const mockHandlePause = () => {
-  console.log('Pause interview');
+  // console.log('Pause interview');
 };
 
 const mockHandleResume = () => {
-  console.log('Resume interview');
+  // console.log('Resume interview');
 };
 
 const mockHandleEndCall = () => {
-  console.log('End call');
+  // console.log('End call');
 };
 
 const mockActiveSession = {
   questions: [
     {
-      text: "Explain the concept of React hooks and their advantages.",
-      difficulty: "Medium",
+      text: 'Explain the concept of React hooks and their advantages.',
+      difficulty: 'Medium',
       timeLimit: 120,
-      answer: "",
-      draft: "",
+      answer: '',
+      draft: '',
       score: 0,
     },
     {
-      text: "How would you optimize the performance of a React application?",
-      difficulty: "Hard",
+      text: 'How would you optimize the performance of a React application?',
+      difficulty: 'Hard',
       timeLimit: 180,
-      answer: "",
-      draft: "",
+      answer: '',
+      draft: '',
       score: 0,
-    }
+    },
   ],
   currentQuestionIndex: 0,
-  id: "test-session-id",
-  candidateId: "test-candidate-id",
+  id: 'test-session-id',
+  candidateId: 'test-candidate-id',
   score: 0,
-  summary: "",
-  notes: "",
+  summary: '',
+  notes: '',
   tags: [],
   pauseHistory: [],
   createdAt: new Date(),
@@ -132,7 +133,8 @@ export const Recording: Story = {
 export const WithTranscript: Story = {
   args: {
     ...Default.args,
-    transcript: 'React hooks are functions that allow you to use state and other React features without writing a class component.',
+    transcript:
+      'React hooks are functions that allow you to use state and other React features without writing a class component.',
   },
 };
 

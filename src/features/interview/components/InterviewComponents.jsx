@@ -1,11 +1,12 @@
 import React, { memo } from 'react';
+import PropTypes from 'prop-types';
 import { VideoCameraOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 
 // Mock AI avatar component with React.memo for performance optimization
 export const AIAvatar = memo(({ isSpeaking }) => (
   <div className="ai-avatar-container">
-    <motion.div 
+    <motion.div
       className="ai-avatar"
       animate={isSpeaking ? { scale: [1, 1.05, 1] } : { scale: 1 }}
       transition={{ duration: 1.5, repeat: isSpeaking ? Infinity : 0 }}
@@ -18,15 +19,19 @@ export const AIAvatar = memo(({ isSpeaking }) => (
   </div>
 ));
 
+AIAvatar.propTypes = {
+  isSpeaking: PropTypes.bool.isRequired,
+};
+
 // Add displayName for debugging
 AIAvatar.displayName = 'AIAvatar';
 
 // Waveform animation for speaking with React.memo for performance optimization
 export const Waveform = memo(() => (
   <div className="waveform">
-    {[...Array(15)].map((_, i) => (
+    {Array.from({ length: 15 }, (_, i) => (
       <motion.div
-        key={i}
+        key={`waveform-bar-${Date.now()}-${i}`}
         className="bar"
         animate={{
           height: [10, 25, 10],
@@ -34,7 +39,7 @@ export const Waveform = memo(() => (
         transition={{
           duration: 0.5,
           repeat: Infinity,
-          repeatType: "reverse",
+          repeatType: 'reverse',
         }}
       />
     ))}

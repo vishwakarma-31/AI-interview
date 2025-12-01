@@ -1,59 +1,76 @@
-import { Context } from 'react';
+/**
+ * @typedef {Object} LoadingStates
+ * @property {boolean} startInterview
+ * @property {boolean} submitAnswer
+ * @property {boolean} fetchCandidates
+ */
 
-interface LoadingStates {
-  startInterview: boolean;
-  submitAnswer: boolean;
-  fetchCandidates: boolean;
-}
+/**
+ * @typedef {Object} Candidate
+ * @property {string} _id
+ * @property {string} name
+ * @property {string} email
+ * @property {string} phone
+ * @property {string} role
+ * @property {string} status
+ * @property {Date} createdAt
+ */
 
-interface Candidate {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: string;
-  status: string;
-  createdAt: Date;
-}
+/**
+ * @typedef {Object} Question
+ * @property {string} [id]
+ * @property {string} text
+ * @property {string} [answer]
+ * @property {string} [draft]
+ * @property {number} [index]
+ */
 
-interface Question {
-  id?: string;
-  text: string;
-  answer?: string;
-  draft?: string;
-  index?: number;
-}
+/**
+ * @typedef {Object} Session
+ * @property {string} id
+ * @property {string} candidateId
+ * @property {Question[]} questions
+ * @property {number} currentQuestionIndex
+ * @property {Date} createdAt
+ * @property {number} [score]
+ * @property {string} [summary]
+ */
 
-interface Session {
-  id: string;
-  candidateId: string;
-  questions: Question[];
-  currentQuestionIndex: number;
-  createdAt: Date;
-  score?: number;
-  summary?: string;
-}
+/**
+ * @typedef {Object} InterviewContextType
+ * @property {Candidate[]} candidates
+ * @property {Candidate | null} activeCandidate
+ * @property {Session | null} activeSession
+ * @property {boolean} loading
+ * @property {LoadingStates} loadingStates
+ * @property {string | null} error
+ * @property {Record<string, string>} errors
+ * @property {function(): void} clearError
+ * @property {function(): void} clearErrors
+ * @property {function(Candidate, Session): void} setActiveCandidate
+ * @property {function(number, string): void} saveDraft
+ * @property {function(): void} abandonActiveInterview
+ * @property {function({
+ *   name: string,
+ *   email: string,
+ *   phone: string,
+ *   role: string,
+ *   resume?: File
+ * }, number?): Promise<any>} startInterview
+ * @property {function({
+ *   sessionId: string,
+ *   answerText: string
+ * }, boolean?, number?): Promise<any>} submitAnswer
+ * @property {function(number?): Promise<Candidate[]>} fetchCandidates
+ */
 
-interface InterviewContextType {
-  candidates: Candidate[];
-  activeCandidate: Candidate | null;
-  activeSession: Session | null;
-  loading: boolean;
-  loadingStates: LoadingStates;
-  error: string | null;
-  errors: Record<string, string>;
-  
-  // Methods
-  clearError: () => void;
-  clearErrors: () => void;
-  setActiveCandidate: (candidate: Candidate, session: Session) => void;
-  saveDraft: (questionIndex: number, draft: string) => void;
-  abandonActiveInterview: () => void;
-  startInterview: (params: { name: string; email: string; phone: string; role: string; resume?: File }, retryCount?: number) => Promise<any>;
-  submitAnswer: (params: { sessionId: string; answerText: string }, optimistic?: boolean, retryCount?: number) => Promise<any>;
-  fetchCandidates: (retryCount?: number) => Promise<Candidate[]>;
-}
+/** @type {import('react').Context<InterviewContextType>} */
+const InterviewContext = /** @type {any} */ {};
 
-export const InterviewContext: Context<InterviewContextType>;
-export const InterviewProvider: React.ComponentType<{ children: React.ReactNode }>;
-export const useInterview: () => InterviewContextType;
+/** @type {React.FC<{ children: React.ReactNode }>} */
+const InterviewProvider = /** @type {any} */ {};
+
+/** @returns {InterviewContextType} */
+const useInterview = () => /** @type {any} */ {};
+
+export { InterviewContext, InterviewProvider, useInterview };

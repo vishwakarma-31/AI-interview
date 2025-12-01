@@ -1,33 +1,32 @@
-import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock the IntervieweeView component to test webcam functionality
 const mockUseInterview = vi.fn();
 vi.mock('../../contexts/InterviewContext.jsx', () => ({
-  useInterview: () => mockUseInterview()
+  useInterview: () => mockUseInterview(),
 }));
 
 // Mock child components
 vi.mock('../../components/IntervieweeErrorBoundary.jsx', () => ({
-  default: ({ children }) => <div>{children}</div>
+  default: ({ children }) => <div>{children}</div>,
 }));
 
 describe('Webcam Permission Handling', () => {
-  it('should show camera access denied message when permission is denied', async () => {
+  it('should show camera access denied message when permission is denied', () => {
     // Mock navigator.mediaDevices.getUserMedia to reject
     const mockGetUserMedia = vi.fn().mockRejectedValue(new Error('Permission denied'));
     Object.defineProperty(navigator, 'mediaDevices', {
       writable: true,
       value: {
-        getUserMedia: mockGetUserMedia
-      }
+        getUserMedia: mockGetUserMedia,
+      },
     });
 
     mockUseInterview.mockReturnValue({
       activeCandidate: { status: 'in-progress' },
       activeSession: {
         questions: [{ text: 'Test question', difficulty: 'Easy', time: 60 }],
-        currentQuestionIndex: 0
+        currentQuestionIndex: 0,
       },
       loadingStates: {},
       error: null,
@@ -36,17 +35,17 @@ describe('Webcam Permission Handling', () => {
       clearErrors: vi.fn(),
       saveDraft: vi.fn(),
       startInterview: vi.fn(),
-      submitAnswer: vi.fn()
+      submitAnswer: vi.fn(),
     });
 
     // Render the component (this would be the IntervieweeView or a component that includes webcam)
     // For this test, we'll simulate the webcam error state directly
-    
+
     // Since we can't easily render the actual component with webcam in tests,
     // we'll test the error handling logic by directly testing the component
     // that would show the error message
-    
-    // In a real implementation, you would render the IntervieweeView and 
+
+    // In a real implementation, you would render the IntervieweeView and
     // simulate the webcam error through mocking
     expect(true).toBe(true); // Placeholder test
   });

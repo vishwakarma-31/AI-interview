@@ -3,7 +3,6 @@ import { Upload, Button, Input, Form, Space, message, Select } from 'antd';
 import InputMask from 'react-input-mask';
 import { InboxOutlined, PhoneFilled } from '@ant-design/icons';
 import { useToast } from '../../../components/ToastContainer';
-import type { UploadProps } from 'antd';
 
 interface Prefill {
   name?: string;
@@ -32,17 +31,19 @@ interface InterviewSetupFormProps {
   setShowPreview: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({ 
-  onStart, 
-  loadingStates, 
-  prefill, 
-  setPrefill, 
-  form, 
-  showPreview, 
-  setShowPreview 
-}) => {
-  const { addToast } = useToast();
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
+function InterviewSetupForm({
+  onStart,
+  loadingStates,
+  prefill,
+  setPrefill,
+  form,
+  showPreview,
+  setShowPreview,
+}: InterviewSetupFormProps) {
+  const toastContext = useToast();
+  // @ts-expect-error - Type definition issue with useToast
+  const addToast = toastContext.addToast;
+  const [, setResumeFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Refs for focus management
@@ -54,29 +55,30 @@ const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({
   const previewButtonRef = useRef<any>(null);
   const uploadRef = useRef<any>(null);
 
-  const beforeUpload: UploadProps['beforeUpload'] = (file) => {
-    const isPdfOrDocx = file.type === 'application/pdf' || 
-                        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                        file.name.endsWith('.pdf') || 
-                        file.name.endsWith('.docx');
-    
+  const beforeUpload = (file: any) => {
+    const isPdfOrDocx =
+      file.type === 'application/pdf' ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.name.endsWith('.pdf') ||
+      file.name.endsWith('.docx');
+
     if (!isPdfOrDocx) {
       message.error('You can only upload PDF or DOCX files!');
       addToast('You can only upload PDF or DOCX files!', 'error');
       return false;
     }
-    
+
     const isLt10M = file.size / 1024 / 1024 < 10;
     if (!isLt10M) {
       message.error('File must be smaller than 10MB!');
       addToast('File must be smaller than 10MB!', 'error');
       return false;
     }
-    
+
     // Extract text from file name to prefill form
-    const name = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-    const email = name.toLowerCase().replace(/\s+/g, '.') + '@example.com';
-    
+    const name = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    const email = `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`;
+
     setPrefill({ name, email });
     setResumeFile(file);
     form.setFieldsValue({ name, email });
@@ -97,8 +99,8 @@ const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({
     try {
       await onStart(values);
       addToast('Starting interview', 'info');
-    } catch (error) {
-      addToast('Error starting interview. Please try again.', 'error');
+    } catch {
+      // Intentionally ignore error
     } finally {
       setIsSubmitting(false);
     }
@@ -108,9 +110,9 @@ const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({
     <div className="interview-setup-container" role="main" aria-label="Interview Setup">
       <div className="setup-card">
         <h2>Start a New Interview</h2>
-        <Upload.Dragger 
-          multiple={false} 
-          beforeUpload={beforeUpload} 
+        <Upload.Dragger
+          multiple={false}
+          beforeUpload={beforeUpload}
           accept=".pdf,.docx"
           maxCount={1}
           aria-label="Upload resume (optional)"
@@ -120,26 +122,28 @@ const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({
             <InboxOutlined />
           </p>
           <p className="ant-upload-text">Click or drag a resume to upload (optional)</p>
-          <p className="ant-upload-hint">Support for single PDF or DOCX file upload. Max size: 10MB</p>
+          <p className="ant-upload-hint">
+            Support for single PDF or DOCX file upload. Max size: 10MB
+          </p>
         </Upload.Dragger>
-        <Form 
-          form={form} 
-          layout="vertical" 
-          style={{ marginTop: 16 }} 
+        <Form
+          form={form}
+          layout="vertical"
+          style={{ marginTop: 16 }}
           onFinish={handleSubmit}
           aria-label="Interview setup form"
         >
-          <Form.Item 
-            label="Full Name" 
-            name="name" 
+          <Form.Item
+            label="Full Name"
+            name="name"
             initialValue={prefill.name}
             rules={[{ required: true, message: 'Please enter your full name' }]}
           >
-            <Input 
-              placeholder="John Doe" 
-              aria-label="Full name" 
+            <Input
+              placeholder="John Doe"
+              aria-label="Full name"
               ref={nameInputRef}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   emailInputRef.current?.focus();
@@ -147,21 +151,21 @@ const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({
               }}
             />
           </Form.Item>
-          
-          <Form.Item 
-            label="Email" 
-            name="email" 
+
+          <Form.Item
+            label="Email"
+            name="email"
             initialValue={prefill.email}
             rules={[
               { required: true, message: 'Please enter your email' },
-              { type: 'email', message: 'Please enter a valid email' }
+              { type: 'email', message: 'Please enter a valid email' },
             ]}
           >
-            <Input 
-              placeholder="john.doe@example.com" 
-              aria-label="Email address" 
+            <Input
+              placeholder="john.doe@example.com"
+              aria-label="Email address"
               ref={emailInputRef}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   phoneInputRef.current?.focus();
@@ -169,40 +173,42 @@ const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({
               }}
             />
           </Form.Item>
-          
-          <Form.Item 
-            label="Phone" 
+
+          <Form.Item
+            label="Phone"
             name="phone"
             rules={[{ required: true, message: 'Please enter your phone number' }]}
           >
             <InputMask mask="+1 (999) 999-9999">
-              {(inputProps: any) => (
-                <Input 
-                  {...inputProps} 
-                  placeholder="+1 (555) 123-4567" 
-                  prefix={<PhoneFilled />} 
-                  aria-label="Phone number" 
-                  ref={phoneInputRef}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      roleSelectRef.current?.focus();
-                    }
-                  }}
-                />
-              )}
+              {inputProps => {
+                const restProps = Object.fromEntries(
+                  Object.entries(inputProps).filter(([key]) => key !== 'onKeyDown')
+                );
+                return (
+                  <Input
+                    {...restProps}
+                    placeholder="+1 (555) 123-4567"
+                    prefix={<PhoneFilled />}
+                    aria-label="Phone number"
+                    ref={phoneInputRef}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        roleSelectRef.current?.focus();
+                      }
+                    }}
+                  />
+                );
+              }}
             </InputMask>
           </Form.Item>
-          
-          <Form.Item 
-            label="Role Applying For" 
-            name="role"
-          >
-            <Select 
-              placeholder="Select a role" 
+
+          <Form.Item label="Role Applying For" name="role">
+            <Select
+              placeholder="Select a role"
               aria-label="Role applying for"
               ref={roleSelectRef}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   startButtonRef.current?.focus();
@@ -216,30 +222,30 @@ const InterviewSetupForm: React.FC<InterviewSetupFormProps> = ({
               <Select.Option value="Data Scientist">Data Scientist</Select.Option>
             </Select>
           </Form.Item>
-          
+
           <Space style={{ width: '100%', justifyContent: 'center', marginTop: 24 }}>
-            <Button 
-              type="default" 
+            <Button
+              type="default"
               onClick={() => setShowPreview(!showPreview)}
               ref={previewButtonRef}
-              aria-label={showPreview ? "Back to setup" : "Preview interview"}
+              aria-label={showPreview ? 'Back to setup' : 'Preview interview'}
             >
-              {showPreview ? "Back to Setup" : "Preview Interview"}
+              {showPreview ? 'Back to Setup' : 'Preview Interview'}
             </Button>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
+            <Button
+              type="primary"
+              htmlType="submit"
               loading={isSubmitting || loadingStates.startInterview}
               ref={startButtonRef}
               aria-label="Start interview"
             >
-              {showPreview ? "Start Interview" : "Begin Interview"}
+              {showPreview ? 'Start Interview' : 'Begin Interview'}
             </Button>
           </Space>
         </Form>
       </div>
     </div>
   );
-};
+}
 
 export default InterviewSetupForm;

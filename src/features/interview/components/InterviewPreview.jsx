@@ -1,28 +1,10 @@
 import React, { useState } from 'react';
 import { Button, Card, List, Modal, Steps } from 'antd';
-import { EyeOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined } from '@ant-design/icons';
 import PropTypes from 'prop-types';
 
-const InterviewPreview = ({ interviewData, onStartInterview, onCancel }) => {
-  const [currentStep, setCurrentStep] = useState(0);
+export default function InterviewPreview({ interviewData, onStartInterview, onCancel }) {
   const [showStartModal, setShowStartModal] = useState(false);
-
-  // Define PropTypes for better type checking
-  InterviewPreview.propTypes = {
-    interviewData: PropTypes.shape({
-      name: PropTypes.string,
-      email: PropTypes.string,
-      phone: PropTypes.string,
-      role: PropTypes.string,
-      questions: PropTypes.arrayOf(PropTypes.shape({
-        text: PropTypes.string.isRequired,
-        difficulty: PropTypes.string.isRequired,
-        timeLimit: PropTypes.number.isRequired,
-      })).isRequired,
-    }),
-    onStartInterview: PropTypes.func.isRequired,
-    onCancel: PropTypes.func.isRequired,
-  };
 
   const questions = interviewData?.questions || [];
   const role = interviewData?.role || 'Frontend Developer';
@@ -45,14 +27,14 @@ const InterviewPreview = ({ interviewData, onStartInterview, onCancel }) => {
 
       {/* Progress indicator */}
       <div style={{ marginBottom: 24 }}>
-        <Steps 
-          size="small" 
+        <Steps
+          size="small"
           current={2}
           items={[
             { title: 'Setup' },
             { title: 'Preview' },
             { title: 'Questions' },
-            { title: 'Complete' }
+            { title: 'Complete' },
           ]}
         />
       </div>
@@ -61,15 +43,15 @@ const InterviewPreview = ({ interviewData, onStartInterview, onCancel }) => {
         <Card className="preview-card" title="Interview Details">
           <div className="interview-info">
             <div className="info-item">
-              <label>Role:</label>
+              <span>Role:</span>
               <span>{role}</span>
             </div>
             <div className="info-item">
-              <label>Questions:</label>
+              <span>Questions:</span>
               <span>{questions.length} questions</span>
             </div>
             <div className="info-item">
-              <label>Estimated Time:</label>
+              <span>Estimated Time:</span>
               <span>{questions.length * 2} minutes</span>
             </div>
           </div>
@@ -96,15 +78,11 @@ const InterviewPreview = ({ interviewData, onStartInterview, onCancel }) => {
         </Card>
 
         <div className="preview-actions">
-          <Button 
-            onClick={onCancel}
-            size="large"
-            aria-label="Back to setup"
-          >
+          <Button onClick={onCancel} size="large" aria-label="Back to setup">
             Back
           </Button>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             icon={<PlayCircleOutlined />}
             onClick={handleStartInterview}
             size="large"
@@ -130,6 +108,22 @@ const InterviewPreview = ({ interviewData, onStartInterview, onCancel }) => {
       </Modal>
     </div>
   );
-};
+}
 
-export default InterviewPreview;
+InterviewPreview.propTypes = {
+  interviewData: PropTypes.shape({
+    name: PropTypes.string,
+    email: PropTypes.string,
+    phone: PropTypes.string,
+    role: PropTypes.string,
+    questions: PropTypes.arrayOf(
+      PropTypes.shape({
+        text: PropTypes.string.isRequired,
+        difficulty: PropTypes.string.isRequired,
+        timeLimit: PropTypes.number.isRequired,
+      })
+    ).isRequired,
+  }).isRequired,
+  onStartInterview: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+};

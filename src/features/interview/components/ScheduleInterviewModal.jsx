@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { Modal, Form, DatePicker, TimePicker, InputNumber, Button, message } from 'antd';
 import { api } from '../../../services/api';
-import { useToast } from '../../../components/ToastContainer.jsx';
+import { useToast } from '../../../components/ToastContainer';
 
-const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }) => {
+export default function ScheduleInterviewModal({ open, onCancel, candidate, onScheduleSuccess }) {
   const [form] = Form.useForm();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -15,24 +16,24 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
     }
   }, [open, candidate, form]);
 
-  const handleSchedule = async (values) => {
+  const handleSchedule = async values => {
     setLoading(true);
     try {
       // Combine date and time
       const scheduledDate = values.date.clone();
       scheduledDate.hour(values.time.hour());
       scheduledDate.minute(values.time.minute());
-      
+
       // Format to ISO string
       const scheduledAt = scheduledDate.toISOString();
-      
+
       // Call API to schedule interview
       const response = await api.scheduleInterview({
         candidateId: candidate.id,
         scheduledAt,
-        duration: values.duration
+        duration: values.duration,
       });
-      
+
       if (response.success) {
         addToast('Interview scheduled successfully', 'success');
         onScheduleSuccess(response.data.candidate);
@@ -42,7 +43,7 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
         throw new Error(response.error?.message || 'Failed to schedule interview');
       }
     } catch (error) {
-      console.error('Error scheduling interview:', error);
+      // console.error('Error scheduling interview:', error);
       message.error(error.message || 'Failed to schedule interview');
       addToast(error.message || 'Failed to schedule interview', 'error');
     } finally {
@@ -50,7 +51,7 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
     }
   };
 
-  const disabledDate = (current) => {
+  const disabledDate = current => {
     // Can not select days before today
     return current && current < new Date().setHours(0, 0, 0, 0);
   };
@@ -74,7 +75,7 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
           label="Date"
           rules={[{ required: true, message: 'Please select a date' }]}
         >
-          <DatePicker 
+          <DatePicker
             disabledDate={disabledDate}
             format="YYYY-MM-DD"
             aria-label="Select interview date"
@@ -86,10 +87,7 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
           label="Time"
           rules={[{ required: true, message: 'Please select a time' }]}
         >
-          <TimePicker 
-            format="HH:mm"
-            aria-label="Select interview time"
-          />
+          <TimePicker format="HH:mm" aria-label="Select interview time" />
         </Form.Item>
 
         <Form.Item
@@ -98,9 +96,9 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
           rules={[{ required: true, message: 'Please enter duration' }]}
           initialValue={30}
         >
-          <InputNumber 
-            min={15} 
-            max={120} 
+          <InputNumber
+            min={15}
+            max={120}
             step={15}
             aria-label="Enter interview duration in minutes"
           />
@@ -111,9 +109,9 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
             <Button onClick={onCancel} aria-label="Cancel scheduling">
               Cancel
             </Button>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
+            <Button
+              type="primary"
+              htmlType="submit"
               loading={loading}
               aria-label="Schedule interview"
             >
@@ -124,6 +122,14 @@ const ScheduleInterviewModal = ({ open, onCancel, candidate, onScheduleSuccess }
       </Form>
     </Modal>
   );
-};
+}
 
-export default ScheduleInterviewModal;
+ScheduleInterviewModal.propTypes = {
+  open: PropTypes.bool.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  candidate: PropTypes.shape({
+    id: PropTypes.string,
+    name: PropTypes.string,
+  }).isRequired,
+  onScheduleSuccess: PropTypes.func.isRequired,
+};

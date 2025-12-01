@@ -1,45 +1,51 @@
 import React from 'react';
 import { Button, Result, Alert } from 'antd';
+import PropTypes from 'prop-types';
 
 export default class DashboardErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { 
+    this.state = {
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
     };
+    // Bind the method to the class instance
+    this.handleRetry = this.handleRetry.bind(this);
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error) {
     return { hasError: true };
   }
 
   componentDidCatch(error, errorInfo) {
     // Log the error to console
-    console.error('Dashboard error boundary:', error, errorInfo);
-    
+    // console.error('Dashboard error boundary:', error, errorInfo);
+
     // Update state with error details
     this.setState({
-      error: error,
-      errorInfo: errorInfo
+      error,
+      errorInfo,
     });
-    
+
     // In a real application, you might want to send this to an error reporting service
     // like Sentry, Bugsnag, etc.
   }
 
-  handleRetry = () => {
+  handleRetry() {
     // Reset the error state and try to re-render
-    this.setState({ 
+    this.setState({
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
     });
-  };
+  }
 
   render() {
-    if (this.state.hasError) {
+    const { hasError, error, errorInfo } = this.state;
+    const { children } = this.props;
+
+    if (hasError) {
       return (
         <div style={{ padding: 24 }}>
           <Result
@@ -50,22 +56,23 @@ export default class DashboardErrorBoundary extends React.Component {
               <Button type="primary" key="retry" onClick={this.handleRetry}>
                 Try Again
               </Button>,
-              <Button 
-                key="refresh" 
-                onClick={() => window.location.reload()}
-              >
+              <Button key="refresh" onClick={() => window.location.reload()}>
                 Refresh Page
-              </Button>
+              </Button>,
             ]}
           />
-          {process.env.NODE_ENV === 'development' && this.state.error && (
-            <Alert 
+          {process.env.NODE_ENV === 'development' && error && (
+            <Alert
               message="Error Details (Development Only)"
               description={
                 <div>
-                  <p><strong>Error:</strong> {this.state.error.toString()}</p>
-                  <p><strong>Component Stack:</strong></p>
-                  <pre>{this.state.errorInfo.componentStack}</pre>
+                  <p>
+                    <strong>Error:</strong> {error.toString()}
+                  </p>
+                  <p>
+                    <strong>Component Stack:</strong>
+                  </p>
+                  <pre>{errorInfo.componentStack}</pre>
                 </div>
               }
               type="error"
@@ -76,6 +83,10 @@ export default class DashboardErrorBoundary extends React.Component {
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }
+
+DashboardErrorBoundary.propTypes = {
+  children: PropTypes.node.isRequired,
+};

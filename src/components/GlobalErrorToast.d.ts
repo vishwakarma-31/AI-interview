@@ -1,5 +1,8 @@
-import React from 'react';
+/**
+ * @typedef {import('react').ComponentType<any>} GlobalErrorToastType
+ */
 
-const GlobalErrorToast: React.ComponentType<any>;
+/** @type {GlobalErrorToastType} */
+const GlobalErrorToast = /** @type {any} */ {};
 
 export default GlobalErrorToast;

@@ -1,11 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import PropTypes from 'prop-types';
 import App from '../../App';
 
 // Mock the InterviewContext
 const mockUseInterview = vi.fn();
 vi.mock('../../contexts/InterviewContext', () => ({
-  useInterview: () => mockUseInterview()
+  useInterview: () => mockUseInterview(),
 }));
 
 // Mock react-router-dom
@@ -16,39 +17,92 @@ vi.mock('react-router-dom', async () => {
     ...actual,
     useNavigate: () => mockUseNavigate,
     useLocation: () => ({
-      pathname: '/'
-    })
+      pathname: '/',
+    }),
   };
 });
+
+// Define mock components with proper PropTypes
+function MockButton({ children, onClick, type }) {
+  return (
+    <button type={type === 'submit' ? 'submit' : 'button'} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+MockButton.propTypes = {
+  children: PropTypes.node,
+  onClick: PropTypes.func,
+  type: PropTypes.oneOf(['button', 'submit']),
+};
+
+MockButton.defaultProps = {
+  children: null,
+  onClick: () => {},
+  type: 'button',
+};
+
+function MockForm({ children, onFinish }) {
+  return <form onSubmit={onFinish}>{children}</form>;
+}
+
+MockForm.propTypes = {
+  children: PropTypes.node,
+  onFinish: PropTypes.func,
+};
+
+MockForm.defaultProps = {
+  children: null,
+  onFinish: () => {},
+};
+
+function MockInput({ placeholder }) {
+  return <input placeholder={placeholder} />;
+}
+
+MockInput.propTypes = {
+  placeholder: PropTypes.string,
+};
+
+MockInput.defaultProps = {
+  placeholder: '',
+};
+
+function MockSelect({ children, onChange }) {
+  return <select onChange={onChange}>{children}</select>;
+}
+
+MockSelect.propTypes = {
+  children: PropTypes.node,
+  onChange: PropTypes.func,
+};
+
+MockSelect.defaultProps = {
+  children: null,
+  onChange: () => {},
+};
 
 // Mock Ant Design components
 vi.mock('antd', async () => {
   const actual = await vi.importActual('antd');
   return {
     ...actual,
-    Button: ({ children, onClick, ...props }) => (
-      <button onClick={onClick} {...props}>{children}</button>
-    ),
-    Form: ({ children, onFinish }) => (
-      <form onSubmit={onFinish}>{children}</form>
-    ),
-    Input: ({ placeholder, ...props }) => (
-      <input placeholder={placeholder} {...props} />
-    ),
-    Select: ({ children, onChange, ...props }) => (
-      <select onChange={onChange} {...props}>{children}</select>
-    ),
+    Button: MockButton,
+    Form: MockForm,
+    Input: MockInput,
+    Select: MockSelect,
     message: {
       error: vi.fn(),
       success: vi.fn(),
-      warning: vi.fn()
-    }
+      warning: vi.fn(),
+    },
   };
 });
 
 // Mock react-webcam
 vi.mock('react-webcam', () => ({
-  default: () => <div data-testid="webcam">Webcam Component</div>
+  default: () => <div data-testid="webcam">Webcam Component</div>,
 }));
 
 describe('User Flows Integration Tests', () => {
@@ -65,7 +119,7 @@ describe('User Flows Integration Tests', () => {
     mockClearError.mockClear();
     mockClearErrors.mockClear();
     mockUseNavigate.mockClear();
-    
+
     // Reset all mocks
     vi.clearAllMocks();
   });
@@ -82,7 +136,7 @@ describe('User Flows Integration Tests', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     render(<App />);
@@ -91,19 +145,19 @@ describe('User Flows Integration Tests', () => {
     const nameInput = screen.getByPlaceholderText('Enter your full name');
     const emailInput = screen.getByPlaceholderText('Enter your email address');
     const phoneInput = screen.getByPlaceholderText('Enter your phone number');
-    
+
     fireEvent.change(nameInput, { target: { value: 'John Doe' } });
     fireEvent.change(emailInput, { target: { value: 'john@example.com' } });
     fireEvent.change(phoneInput, { target: { value: '+1234567890' } });
-    
+
     // Select a role
     const roleSelect = screen.getByRole('combobox');
     fireEvent.change(roleSelect, { target: { value: 'Frontend' } });
-    
+
     // Check GDPR consent
     const consentCheckbox = screen.getByRole('checkbox');
     fireEvent.click(consentCheckbox);
-    
+
     // Submit the form
     const startButton = screen.getByText('Start Interview');
     fireEvent.click(startButton);
@@ -114,15 +168,15 @@ describe('User Flows Integration Tests', () => {
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        email: 'john@example.com'
+        email: 'john@example.com',
       },
       activeSession: {
         _id: 'session123',
         questions: [
           { text: 'Tell me about yourself', timeLimit: 60 },
-          { text: 'What is your experience with React?', timeLimit: 90 }
+          { text: 'What is your experience with React?', timeLimit: 90 },
         ],
-        currentQuestionIndex: 0
+        currentQuestionIndex: 0,
       },
       loadingStates: {},
       error: null,
@@ -131,7 +185,7 @@ describe('User Flows Integration Tests', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     // Wait for the interview view to render
@@ -142,14 +196,16 @@ describe('User Flows Integration Tests', () => {
 
     // Step 3: Submit an answer
     const answerInput = screen.getByPlaceholderText('Type your answer here...');
-    fireEvent.change(answerInput, { target: { value: 'This is my answer to the first question.' } });
-    
+    fireEvent.change(answerInput, {
+      target: { value: 'This is my answer to the first question.' },
+    });
+
     const submitButton = screen.getByText('Submit Answer');
     fireEvent.click(submitButton);
 
     // Verify submitAnswer was called
     expect(mockSubmitAnswer).toHaveBeenCalledWith({
-      answerText: 'This is my answer to the first question.'
+      answerText: 'This is my answer to the first question.',
     });
 
     // Step 4: Verify navigation to next question
@@ -158,15 +214,15 @@ describe('User Flows Integration Tests', () => {
       activeCandidate: {
         _id: 'candidate123',
         name: 'John Doe',
-        email: 'john@example.com'
+        email: 'john@example.com',
       },
       activeSession: {
         _id: 'session123',
         questions: [
           { text: 'Tell me about yourself', timeLimit: 60 },
-          { text: 'What is your experience with React?', timeLimit: 90 }
+          { text: 'What is your experience with React?', timeLimit: 90 },
         ],
-        currentQuestionIndex: 1
+        currentQuestionIndex: 1,
       },
       loadingStates: {},
       error: null,
@@ -175,7 +231,7 @@ describe('User Flows Integration Tests', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     // Wait for the second question to render
@@ -185,12 +241,14 @@ describe('User Flows Integration Tests', () => {
     });
 
     // Step 5: Submit answer to final question
-    fireEvent.change(answerInput, { target: { value: 'I have 5 years of experience with React.' } });
+    fireEvent.change(answerInput, {
+      target: { value: 'I have 5 years of experience with React.' },
+    });
     fireEvent.click(submitButton);
 
     // Verify submitAnswer was called for the second answer
     expect(mockSubmitAnswer).toHaveBeenCalledWith({
-      answerText: 'I have 5 years of experience with React.'
+      answerText: 'I have 5 years of experience with React.',
     });
   });
 
@@ -205,7 +263,7 @@ describe('User Flows Integration Tests', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     render(<App />);
@@ -233,7 +291,7 @@ describe('User Flows Integration Tests', () => {
       clearErrors: mockClearErrors,
       saveDraft: mockSaveDraft,
       startInterview: mockStartInterview,
-      submitAnswer: mockSubmitAnswer
+      submitAnswer: mockSubmitAnswer,
     });
 
     render(<App />);
@@ -242,14 +300,14 @@ describe('User Flows Integration Tests', () => {
     const nameInput = screen.getByPlaceholderText('Enter your full name');
     const emailInput = screen.getByPlaceholderText('Enter your email address');
     const phoneInput = screen.getByPlaceholderText('Enter your phone number');
-    
+
     fireEvent.change(nameInput, { target: { value: 'John Doe' } });
     fireEvent.change(emailInput, { target: { value: 'john@example.com' } });
     fireEvent.change(phoneInput, { target: { value: '+1234567890' } });
-    
+
     // Mock startInterview to throw an error
     mockStartInterview.mockRejectedValueOnce(new Error('Failed to start interview'));
-    
+
     const startButton = screen.getByText('Start Interview');
     fireEvent.click(startButton);
 

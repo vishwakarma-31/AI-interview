@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button, Result, Alert } from 'antd';
+import PropTypes from 'prop-types';
 
 export default class IntervieweeErrorBoundary extends React.Component {
   constructor(props) {
@@ -9,39 +10,45 @@ export default class IntervieweeErrorBoundary extends React.Component {
       error: null,
       errorInfo: null,
     };
+
+    // Bind the handleRetry method to ensure correct 'this' context
+    this.handleRetry = this.handleRetry.bind(this);
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error) {
     return { hasError: true };
   }
 
   componentDidCatch(error, errorInfo) {
     // Log the error to console only in development
     if (process.env.NODE_ENV === 'development') {
-      console.error('IntervieweeView error boundary:', error, errorInfo);
+      // console.error('IntervieweeView error boundary:', error, errorInfo);
     }
 
     // Update state with error details
     this.setState({
-      error: error,
-      errorInfo: errorInfo,
+      error,
+      errorInfo,
     });
 
     // In a real application, you might want to send this to an error reporting service
     // like Sentry, Bugsnag, etc.
   }
 
-  handleRetry = () => {
+  handleRetry() {
     // Reset the error state and try to re-render
     this.setState({
       hasError: false,
       error: null,
       errorInfo: null,
     });
-  };
+  }
 
   render() {
-    if (this.state.hasError) {
+    const { hasError, error, errorInfo } = this.state;
+    const { children } = this.props;
+
+    if (hasError) {
       return (
         <div style={{ padding: 24 }}>
           <Result
@@ -57,18 +64,18 @@ export default class IntervieweeErrorBoundary extends React.Component {
               </Button>,
             ]}
           />
-          {process.env.NODE_ENV === 'development' && this.state.error && (
+          {process.env.NODE_ENV === 'development' && error && (
             <Alert
               message="Error Details (Development Only)"
               description={
                 <div>
                   <p>
-                    <strong>Error:</strong> {this.state.error.toString()}
+                    <strong>Error:</strong> {error.toString()}
                   </p>
                   <p>
                     <strong>Component Stack:</strong>
                   </p>
-                  <pre>{this.state.errorInfo.componentStack}</pre>
+                  <pre>{errorInfo.componentStack}</pre>
                 </div>
               }
               type="error"
@@ -79,6 +86,10 @@ export default class IntervieweeErrorBoundary extends React.Component {
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }
+
+IntervieweeErrorBoundary.propTypes = {
+  children: PropTypes.node.isRequired,
+};

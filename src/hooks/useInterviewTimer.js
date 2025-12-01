@@ -7,7 +7,7 @@ export const useInterviewTimer = (activeSession, onSubmitAnswer, transcript) => 
   const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [timerDeadline, setTimerDeadline] = useState(null);
   const timerRef = useRef(null);
-  
+
   // Timer effect
   useEffect(() => {
     if (isTimerRunning && !isTimerPaused && activeSession) {
@@ -15,25 +15,25 @@ export const useInterviewTimer = (activeSession, onSubmitAnswer, transcript) => 
       if (question && question.timeLimit) {
         // Initialize timer if not already set
         if (!timerDeadline) {
-          const deadline = Date.now() + (question.timeLimit * 1000);
+          const deadline = Date.now() + question.timeLimit * 1000;
           setTimerDeadline(deadline);
           setTimeLeft(question.timeLimit);
         }
-        
+
         // Start timer countdown
         timerRef.current = setInterval(() => {
           setTimerDeadline(prev => {
             if (prev) {
               const remaining = Math.max(0, Math.floor((prev - Date.now()) / 1000));
               setTimeLeft(remaining);
-              
+
               // Auto-submit when time runs out
               if (remaining <= 0) {
                 clearInterval(timerRef.current);
                 onSubmitAnswer(transcript || '[Time Expired]');
                 return null;
               }
-              
+
               return prev;
             }
             return prev;
@@ -41,14 +41,14 @@ export const useInterviewTimer = (activeSession, onSubmitAnswer, transcript) => 
         }, 1000);
       }
     }
-    
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
   }, [isTimerRunning, isTimerPaused, activeSession, transcript, timerDeadline, onSubmitAnswer]);
-  
+
   // Pause the timer
   const pauseTimer = useCallback(() => {
     if (!activeSession) return;
@@ -60,17 +60,17 @@ export const useInterviewTimer = (activeSession, onSubmitAnswer, transcript) => 
     setIsTimerPaused(true);
     setIsTimerRunning(false);
   }, [activeSession, timerDeadline]);
-  
+
   // Resume the timer
   const resumeTimer = useCallback(() => {
     if (!activeSession) return;
     // Set new deadline based on remaining time
-    const newDeadline = Date.now() + (timeLeft * 1000);
+    const newDeadline = Date.now() + timeLeft * 1000;
     setTimerDeadline(newDeadline);
     setIsTimerPaused(false);
     setIsTimerRunning(true);
   }, [activeSession, timeLeft]);
-  
+
   // Reset the timer
   const resetTimer = useCallback(() => {
     if (timerRef.current) {
@@ -81,7 +81,7 @@ export const useInterviewTimer = (activeSession, onSubmitAnswer, transcript) => 
     setIsTimerRunning(true);
     setIsTimerPaused(false);
   }, []);
-  
+
   return {
     timeLeft,
     isTimerRunning,
@@ -89,6 +89,6 @@ export const useInterviewTimer = (activeSession, onSubmitAnswer, transcript) => 
     timerDeadline,
     pauseTimer,
     resumeTimer,
-    resetTimer
+    resetTimer,
   };
 };

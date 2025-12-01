@@ -1,5 +1,8 @@
-import React from 'react';
+/**
+ * @typedef {import('react').ComponentType<any>} WelcomeBackModalType
+ */
 
-const WelcomeBackModal: React.ComponentType<any>;
+/** @type {WelcomeBackModalType} */
+const WelcomeBackModal = /** @type {any} */ {};
 
 export default WelcomeBackModal;

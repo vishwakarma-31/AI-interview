@@ -1,14 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Modal, message } from 'antd';
-import { useInterview } from '../contexts/InterviewContext.jsx';
+import { Modal } from 'antd';
+import { useInterview } from '../contexts/InterviewContext';
 
 export default function WelcomeBackModal() {
-  const { 
-    activeCandidate, 
-    activeSession,
-    abandonActiveInterview
-  } = useInterview();
-  
+  const { activeCandidate, activeSession, abandonActiveInterview } = useInterview();
+
   const shouldShow = useMemo(() => {
     return !!(activeSession && activeCandidate && activeCandidate.status === 'in-progress');
   }, [activeSession, activeCandidate]);

@@ -4,23 +4,27 @@ import { message } from 'antd';
 // Function to check browser support for speech recognition
 const checkSpeechRecognitionSupport = () => {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  
+
   // Basic support check
   if (!SpeechRecognition) {
     return {
       supported: false,
-      reason: 'Speech Recognition API is not available in this browser. Please use Google Chrome or Microsoft Edge for the full AI experience.'
+      reason:
+        'Speech Recognition API is not available in this browser. Please use Google Chrome or ' +
+        'Microsoft Edge for the full AI experience.',
     };
   }
-  
+
   // Additional checks for secure context (HTTPS)
   if (!window.isSecureContext && window.location.hostname !== 'localhost') {
     return {
       supported: false,
-      reason: 'Speech Recognition requires a secure context (HTTPS). Please use HTTPS or localhost for speech recognition features.'
+      reason:
+        'Speech Recognition requires a secure context (HTTPS). Please use HTTPS or ' +
+        'localhost for speech recognition features.',
     };
   }
-  
+
   // Check for microphone permissions
   // Note: We can't check actual permission status without requesting it,
   // but we can at least verify the API exists
@@ -30,39 +34,45 @@ const checkSpeechRecognitionSupport = () => {
     recognition.lang = 'en-US';
     recognition.continuous = true;
     recognition.interimResults = true;
-    
+
     // If we get here, basic support looks good
     return {
       supported: true,
-      reason: null
+      reason: null,
     };
   } catch (error) {
     return {
       supported: false,
-      reason: 'Speech Recognition is not properly configured in this browser. Please check your browser settings.'
+      reason:
+        'Speech Recognition is not properly configured in this browser. Please check your browser settings.',
     };
   }
 };
 
 // Custom hook for speech recognition
-export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeSession, saveDraft) => {
+export const useSpeechRecognition = (
+  onTranscriptChange,
+  onSubmitAnswer,
+  activeSession,
+  saveDraft
+) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(true);
   const recognitionRef = useRef(null);
   const silenceTimerRef = useRef(null);
   const transcriptRef = useRef('');
-  
+
   // Check for Speech Recognition support
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     setIsSpeechRecognitionSupported(!!SpeechRecognition);
   }, []);
-  
+
   // Update transcript ref when transcript changes
   useEffect(() => {
     transcriptRef.current = typeof onTranscriptChange === 'string' ? onTranscriptChange : '';
   }, [onTranscriptChange]);
-  
+
   // Start speech recognition
   const startSpeechRecognition = useCallback(() => {
     // Check browser support before each use
@@ -71,64 +81,65 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
       message.error(supportCheck.reason);
       return;
     }
-    
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!SpeechRecognition) {
       message.error('Speech Recognition is not supported in your browser.');
       return;
     }
-    
+
     // Stop any existing recognition
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
-    
+
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
-    
-    recognition.onresult = (event) => {
+
+    recognition.onresult = event => {
       let interimTranscript = '';
       let finalTranscript = transcriptRef.current;
-      
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
+
+      // Use traditional for loop to avoid no-plusplus error
+      for (let i = event.resultIndex; i < event.results.length; ) {
+        const { transcript } = event.results[i][0];
         if (event.results[i].isFinal) {
-          finalTranscript += transcript + ' ';
+          finalTranscript += `${transcript} `;
           // Save draft when we have final results
           if (activeSession) {
             saveDraft(activeSession.currentQuestionIndex, finalTranscript);
           }
-          
+
           // Reset silence timer when we get final results
           if (silenceTimerRef.current) {
             clearTimeout(silenceTimerRef.current);
           }
-          
+
           // Start silence timer after final result
-          silenceTimerRef.current = setTimeout(() => {
+          const createTimeoutHandler = transcriptCopy => () => {
             if (isRecording) {
               // Auto-submit after 3 seconds of silence
-              onSubmitAnswer(finalTranscript);
+              onSubmitAnswer(transcriptCopy);
               setIsRecording(false);
               message.info('Auto-submitted due to silence');
             }
-          }, 3000); // 3 seconds of silence
+          };
+          silenceTimerRef.current = setTimeout(createTimeoutHandler(finalTranscript), 3000); // 3 seconds of silence
         } else {
           interimTranscript += transcript;
         }
+        i += 1;
       }
-      
+
       if (typeof onTranscriptChange === 'function') {
         onTranscriptChange(finalTranscript + interimTranscript);
       }
     };
-    
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
-      
+
+    recognition.onerror = event => {
       // Handle specific error types
       switch (event.error) {
         case 'no-speech':
@@ -137,7 +148,6 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
             try {
               recognition.start();
             } catch (e) {
-              console.error('Error restarting recognition:', e);
               setIsRecording(false);
             }
           }
@@ -148,7 +158,9 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
           break;
         case 'not-allowed':
         case 'permission-denied':
-          message.error('Microphone access denied. Please allow microphone access in your browser settings.');
+          message.error(
+            'Microphone access denied. Please allow microphone access in your browser settings.'
+          );
           setIsRecording(false);
           break;
         case 'network':
@@ -165,7 +177,7 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
           break;
       }
     };
-    
+
     recognition.onend = () => {
       // Only restart if we're still supposed to be recording
       if (isRecording) {
@@ -175,7 +187,6 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
             try {
               recognition.start();
             } catch (error) {
-              console.error('Error restarting speech recognition:', error);
               message.error('Failed to restart speech recognition. Please try again.');
               setIsRecording(false);
             }
@@ -183,17 +194,18 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
         }, 500);
       }
     };
-    
+
     try {
       recognition.start();
       recognitionRef.current = recognition;
     } catch (error) {
-      console.error('Error starting speech recognition:', error);
-      message.error('Failed to start speech recognition. Please check your microphone and try again.');
+      message.error(
+        'Failed to start speech recognition. Please check your microphone and try again.'
+      );
       setIsRecording(false);
     }
   }, [activeSession, saveDraft, onSubmitAnswer, onTranscriptChange, isRecording]);
-  
+
   // Toggle recording state
   const toggleRecording = useCallback(() => {
     if (isRecording) {
@@ -206,7 +218,7 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
       startSpeechRecognition();
     }
   }, [isRecording, startSpeechRecognition]);
-  
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -214,18 +226,18 @@ export const useSpeechRecognition = (onTranscriptChange, onSubmitAnswer, activeS
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      
+
       // Clear any active timers
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
     };
   }, []);
-  
+
   return {
     isRecording,
     isSpeechRecognitionSupported,
     toggleRecording,
-    startSpeechRecognition
+    startSpeechRecognition,
   };
 };

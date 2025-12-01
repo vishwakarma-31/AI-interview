@@ -1,7 +1,7 @@
 import React from 'react';
-import { Meta, StoryObj } from '@storybook/react';
-import InterviewSetupForm from './InterviewSetupForm';
+import type { Meta, StoryObj } from '@storybook/react';
 import { Form } from 'antd';
+import InterviewSetupForm from './InterviewSetupForm';
 
 const meta: Meta<typeof InterviewSetupForm> = {
   title: 'Interview/InterviewSetupForm',
@@ -24,23 +24,21 @@ const meta: Meta<typeof InterviewSetupForm> = {
 };
 
 export default meta;
+
 type Story = StoryObj<typeof InterviewSetupForm>;
 
 // Mock functions for the story
-const mockOnStart = async (values: any) => {
-  console.log('Starting interview with values:', values);
+const mockOnStart = async (_values: any) => {
+  // console.log('Starting interview with values:', values);
 };
 
-const mockSetPrefill = (prefill: any) => {
-  console.log('Setting prefill:', prefill);
+const mockSetPrefill = (_prefill: any) => {
+  // console.log('Setting prefill:', prefill);
 };
 
-const mockSetShowPreview = (showPreview: React.SetStateAction<boolean>) => {
-  console.log('Setting showPreview:', showPreview);
+const mockSetShowPreview = (_showPreview: React.SetStateAction<boolean>) => {
+  // console.log('Setting showPreview:', showPreview);
 };
-
-// Create a form instance for the story
-const [form] = Form.useForm();
 
 export const Default: Story = {
   args: {
@@ -54,7 +52,7 @@ export const Default: Story = {
       email: '',
     },
     setPrefill: mockSetPrefill,
-    form: form,
+    form: Form.useForm()[0],
     showPreview: false,
     setShowPreview: mockSetShowPreview,
   },
